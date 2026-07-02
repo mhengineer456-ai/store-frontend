@@ -267,7 +267,7 @@ async function fetchLotMatrixViaSheetsApi(lotNo, signal) {
     const { searchKey } = classifyLot(lotNo);
     console.log('Searching for lot locally:', { searchKey });
 
-    const API_BASE_URL = 'http://' + window.location.hostname + ':5000/api';
+    const API_BASE_URL = `${getBackendUrl()}/api`;
     try {
         const res = await fetch(`${API_BASE_URL}/cutting/${searchKey}`, { signal });
         if (res.ok) {
