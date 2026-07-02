@@ -2226,7 +2226,7 @@ export default function App() {
               {(() => {
                 let type = 'info';
                 let cleanMessage = customAlert || '';
-                
+
                 if (cleanMessage.includes('✅') || cleanMessage.toLowerCase().includes('success') || cleanMessage.toLowerCase().includes('downloaded')) {
                   type = 'success';
                   cleanMessage = cleanMessage.replace('✅', '').trim();
@@ -2264,10 +2264,10 @@ export default function App() {
                 return (
                   <>
                     {getIcon()}
-                    <h3 style={{ 
-                      fontFamily: 'var(--font-family-title)', 
-                      fontSize: '20px', 
-                      fontWeight: '800', 
+                    <h3 style={{
+                      fontFamily: 'var(--font-family-title)',
+                      fontSize: '20px',
+                      fontWeight: '800',
                       color: getHeaderColor(),
                       marginBottom: '12px',
                       textTransform: 'uppercase',
@@ -2275,10 +2275,10 @@ export default function App() {
                     }}>
                       {type === 'success' ? 'Success' : type === 'error' ? 'Error' : type === 'warning' ? 'Alert' : 'Notification'}
                     </h3>
-                    <div style={{ 
-                      fontSize: '14.5px', 
-                      color: 'var(--text-main)', 
-                      lineHeight: '1.6', 
+                    <div style={{
+                      fontSize: '14.5px',
+                      color: 'var(--text-main)',
+                      lineHeight: '1.6',
                       marginBottom: '24px',
                       fontWeight: '500',
                       textAlign: 'center'
@@ -2290,12 +2290,12 @@ export default function App() {
                   </>
                 );
               })()}
-              <button 
-                type="button" 
-                className="btn btn-primary" 
+              <button
+                type="button"
+                className="btn btn-primary"
                 onClick={() => setCustomAlert(null)}
-                style={{ 
-                  minWidth: '120px', 
+                style={{
+                  minWidth: '120px',
                   borderRadius: '20px',
                   padding: '10px 24px',
                   boxShadow: 'var(--shadow-md)',
