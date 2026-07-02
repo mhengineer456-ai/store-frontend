@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import {
   Search, Clock, User, ClipboardList, CheckCircle, XCircle,
@@ -104,8 +105,7 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
     const fetchHistoryData = async () => {
       setIsLoading(true);
       setErrorMessage('');
-      const hostname = window.location.hostname;
-      const backendUrl = `http://${hostname}:5000`;
+      const backendUrl = getBackendUrl();
 
       try {
         const [historyRes, scansRes, headersRes, dooriRes, posRes, issueRes] = await Promise.all([
@@ -493,7 +493,7 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
   // Helper function to resolve dynamic design image preview URLs
   const getCleanImageUrl = (url) => {
     if (!url) return '';
-    return url.replace('https://store-backend-1-ff8d.onrender.com', `http://${window.location.hostname}:5000`);
+    return url.replace('https://store-backend-1-ff8d.onrender.com', `${getBackendUrl()}`);
   };
 
   return (

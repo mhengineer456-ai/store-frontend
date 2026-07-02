@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -1095,7 +1096,7 @@ const generateSimpleQR = async (lotNumber) => {
         if (isLocalHostOrIP) {
             let serverIp = window.location.hostname;
             try {
-                const res = await fetch(`http://${window.location.hostname}:5000/api/public/server-ip`);
+                const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.ip) {
@@ -1856,7 +1857,7 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
     useEffect(() => {
         const fetchAvailableLots = async () => {
             try {
-                const res = await fetch('http://' + window.location.hostname + ':5000/api/designs');
+                const res = await fetch(`${getBackendUrl()}/api/designs`);
                 if (res.ok) {
                     const data = await res.json();
                     setAvailableLots(data.filter(d => d.status === 'Approved').slice(0, 6));
@@ -2283,7 +2284,7 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
                         placementZipTypes,
                         zipQualityData,
                     };
-                    await fetch(`http://${window.location.hostname}:5000/api/cutting-headers/${matrix.lotNumber}/payload`, {
+                    await fetch(`${getBackendUrl()}/api/cutting-headers/${matrix.lotNumber}/payload`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ zip_payload: JSON.stringify(zipPayload) })
@@ -4201,10 +4202,7 @@ export function ZipDashboard({ onCompileNewPO }) {
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(10);
 
-    const backendUrl = useMemo(() => {
-        const hostname = window.location.hostname;
-        return `http://${hostname}:5000`;
-    }, []);
+    const backendUrl = getBackendUrl();
 
     const fetchDashboardData = async () => {
         setLoading(true);

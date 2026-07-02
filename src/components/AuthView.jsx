@@ -1,7 +1,8 @@
+import { getBackendUrl } from '../utils/api';
 import { useState, useEffect, useRef } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, Layers3, ArrowRight, ShieldAlert, Check, X } from 'lucide-react';
 
-const API_BASE_URL = `http://${window.location.hostname}:5000/api/auth`;
+const API_BASE_URL = `${getBackendUrl()}/api/auth`;
 
 export default function AuthView({ onLoginSuccess }) {
   const [activeTab, setActiveTab] = useState('login');

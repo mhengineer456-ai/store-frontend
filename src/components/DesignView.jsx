@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import { useState, useEffect } from 'react';
 import { Layers3, PlusCircle, Trash2, Tag, Search, Database, Printer } from 'lucide-react';
 
@@ -14,7 +15,7 @@ export const getCleanImageUrl = (url) => {
   }
 
   if (fileId) {
-    return `http://${window.location.hostname}:5000/api/image-proxy?url=${encodeURIComponent(url)}`;
+    return `${getBackendUrl()}/api/image-proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
 };
@@ -499,7 +500,7 @@ export default function DesignView({
     setFetchMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch(`http://${window.location.hostname}:5000/api/lot/${targetLot}`);
+      const response = await fetch(`${getBackendUrl()}/api/lot/${targetLot}`);
       const data = await response.json();
 
       if (!response.ok) {

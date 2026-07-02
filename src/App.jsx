@@ -1,3 +1,4 @@
+import { getBackendUrl } from './utils/api';
 import { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard, Layers3, CheckSquare, FileText,
@@ -193,15 +194,7 @@ export const getRolePanel = (role) => {
   return 'store';
 };
 
-export const getBackendUrl = () => {
-  const hostname = window.location.hostname;
-  const port = window.location.port;
-  if (!port || port === '5000') {
-    return window.location.origin;
-  }
-  return `http://${hostname}:5000`;
-};
-
+export { getBackendUrl };
 export const hasTabAccess = (tabName, role) => {
   const panel = getRolePanel(role);
   if (panel === 'admin') return true;
@@ -405,7 +398,7 @@ export default function App() {
   useEffect(() => {
     const fetchSyncedLots = async () => {
       try {
-        const response = await fetch('http://' + window.location.hostname + ':5000/api/lots');
+        const response = await fetch(`${getBackendUrl()}/api/lots`);
         if (response.ok) {
           const data = await response.json();
           setSyncedLots(data);
@@ -421,7 +414,7 @@ export default function App() {
   useEffect(() => {
     const fetchDesigns = async () => {
       try {
-        const response = await fetch('http://' + window.location.hostname + ':5000/api/designs');
+        const response = await fetch(`${getBackendUrl()}/api/designs`);
         if (response.ok) {
           const data = await response.json();
           const sorted = data.sort((a, b) => {
@@ -454,7 +447,7 @@ export default function App() {
   useEffect(() => {
     const fetchMaterials = async () => {
       try {
-        const response = await fetch('http://' + window.location.hostname + ':5000/api/materials');
+        const response = await fetch(`${getBackendUrl()}/api/materials`);
         if (response.ok) {
           const data = await response.json();
           if (data.length > 0) setMaterials(data);
@@ -470,7 +463,7 @@ export default function App() {
   useEffect(() => {
     const fetchApprovalRequests = async () => {
       try {
-        const response = await fetch('http://' + window.location.hostname + ':5000/api/approval-requests');
+        const response = await fetch(`${getBackendUrl()}/api/approval-requests`);
         if (response.ok) {
           const data = await response.json();
           setApprovalRequests(data);
@@ -565,7 +558,7 @@ export default function App() {
   useEffect(() => {
     const fetchPOs = async () => {
       try {
-        const res = await fetch('http://' + window.location.hostname + ':5000/api/pos');
+        const res = await fetch(`${getBackendUrl()}/api/pos`);
         if (res.ok) {
           const data = await res.json();
           if (data.length > 0) setPOs(data);
@@ -581,7 +574,7 @@ export default function App() {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const res = await fetch('http://' + window.location.hostname + ':5000/api/vendors');
+        const res = await fetch(`${getBackendUrl()}/api/vendors`);
         if (res.ok) {
           const data = await res.json();
           if (data.length > 0) setVendors(data);
@@ -597,7 +590,7 @@ export default function App() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('http://' + window.location.hostname + ':5000/api/settings');
+        const res = await fetch(`${getBackendUrl()}/api/settings`);
         if (res.ok) {
           const data = await res.json();
           if (data.accessoriesList && data.accessoriesList.length > 0)
@@ -616,7 +609,7 @@ export default function App() {
   useEffect(() => {
     const fetchIssueLogs = async () => {
       try {
-        const res = await fetch('http://' + window.location.hostname + ':5000/api/issue-logs');
+        const res = await fetch(`${getBackendUrl()}/api/issue-logs`);
         if (res.ok) {
           const data = await res.json();
           setIssueLogs(data);
@@ -638,7 +631,7 @@ export default function App() {
       }
 
       try {
-        const response = await fetch('http://' + window.location.hostname + ':5000/api/auth/me', {
+        const response = await fetch(`${getBackendUrl()}/api/auth/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         const data = await response.json();
@@ -764,7 +757,7 @@ export default function App() {
       });
     });
     try {
-      await fetch('http://' + window.location.hostname + ':5000/api/designs', {
+      await fetch(`${getBackendUrl()}/api/designs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...designWithTime, actorName: currentUser?.name || 'Designer' })
@@ -799,7 +792,7 @@ export default function App() {
     }, 4000);
 
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/designs/${id}/status`, {
+      await fetch(`${getBackendUrl()}/api/designs/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status, comments: comment, actorName: currentUser?.name || 'Admin' })
@@ -814,7 +807,7 @@ export default function App() {
     try {
       await Promise.all(
         updatedMaterials.map(m =>
-          fetch(`http://${window.location.hostname}:5000/api/materials/${m.id}`, {
+          fetch(`${getBackendUrl()}/api/materials/${m.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(m)
@@ -844,7 +837,7 @@ export default function App() {
     if (changedMaterials.length > 0) syncMaterialsToDb(changedMaterials);
 
     // Save PO to database
-    fetch('http://' + window.location.hostname + ':5000/api/pos', {
+    fetch(`${getBackendUrl()}/api/pos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newPO)
@@ -853,7 +846,7 @@ export default function App() {
 
   // Helper to persist a new issue/return log entry to the backend
   const syncIssueLogToDb = (log) => {
-    fetch('http://' + window.location.hostname + ':5000/api/issue-logs', {
+    fetch(`${getBackendUrl()}/api/issue-logs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(log)
@@ -941,7 +934,7 @@ export default function App() {
   const handleAddMaterial = async (newMat) => {
     setMaterials(prev => [newMat, ...prev]);
     try {
-      await fetch('http://' + window.location.hostname + ':5000/api/materials', {
+      await fetch(`${getBackendUrl()}/api/materials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMat)
@@ -954,7 +947,7 @@ export default function App() {
   const handleDeleteMaterial = async (id) => {
     setMaterials(prev => prev.filter(m => m.id !== id));
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/materials/${id}`, { method: 'DELETE' });
+      await fetch(`${getBackendUrl()}/api/materials/${id}`, { method: 'DELETE' });
     } catch (err) {
       console.error('Failed to delete material from DB:', err);
     }
@@ -976,7 +969,7 @@ export default function App() {
     setApprovalRequests(prev => [newRequest, ...prev]);
     // Persist to DB so admin sees it
     try {
-      await fetch('http://' + window.location.hostname + ':5000/api/approval-requests', {
+      await fetch(`${getBackendUrl()}/api/approval-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newRequest)
@@ -1010,7 +1003,7 @@ export default function App() {
       // Update the design status in list and DB
       setDesigns(prev => prev.map(d => String(d.id) === String(req.lotId) ? { ...d, status: 'Approved' } : d));
       try {
-        await fetch(`http://${window.location.hostname}:5000/api/designs/${req.lotId}/status`, {
+        await fetch(`${getBackendUrl()}/api/designs/${req.lotId}/status`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status: 'Approved', comments: 'Approved via Queue', actorName: currentUser?.name || 'Admin' })
@@ -1026,7 +1019,7 @@ export default function App() {
       prev.map(r => r.id === requestId ? { ...r, status: 'approved', resolvedDate } : r)
     );
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/approval-requests/${requestId}/status`, {
+      await fetch(`${getBackendUrl()}/api/approval-requests/${requestId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'approved', resolvedDate })
@@ -1051,7 +1044,7 @@ export default function App() {
         // Update the design status in list and DB
         setDesigns(prev => prev.map(d => String(d.id) === String(req.lotId) ? { ...d, status: 'Rejected', comments: reason } : d));
         try {
-          await fetch(`http://${window.location.hostname}:5000/api/designs/${req.lotId}/status`, {
+          await fetch(`${getBackendUrl()}/api/designs/${req.lotId}/status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'Rejected', comments: reason, actorName: currentUser?.name || 'Admin' })
@@ -1067,7 +1060,7 @@ export default function App() {
       setTimeout(() => setToast(null), 5000);
     }
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/approval-requests/${requestId}/status`, {
+      await fetch(`${getBackendUrl()}/api/approval-requests/${requestId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'rejected', rejectionReason: reason, resolvedDate })
@@ -1079,7 +1072,7 @@ export default function App() {
 
   const handleAddVendor = (newVendor) => {
     setVendors(prev => [...prev, newVendor]);
-    fetch('http://' + window.location.hostname + ':5000/api/vendors', {
+    fetch(`${getBackendUrl()}/api/vendors`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newVendor)
@@ -1088,14 +1081,14 @@ export default function App() {
 
   const handleDeleteVendor = (id) => {
     setVendors(prev => prev.filter(v => v.id !== id));
-    fetch(`http://${window.location.hostname}:5000/api/vendors/${id}`, { method: 'DELETE' })
+    fetch(`${getBackendUrl()}/api/vendors/${id}`, { method: 'DELETE' })
       .catch(err => console.error('Failed to delete vendor from DB:', err));
   };
 
   const handleUpdateMaterial = async (updatedMat) => {
     setMaterials(prev => prev.map(m => m.id === updatedMat.id ? updatedMat : m));
     try {
-      await fetch(`http://${window.location.hostname}:5000/api/materials/${updatedMat.id}`, {
+      await fetch(`${getBackendUrl()}/api/materials/${updatedMat.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedMat)
@@ -1152,7 +1145,7 @@ export default function App() {
     if (!accessoriesList.some(item => item.toLowerCase() === trimmed.toLowerCase())) {
       const updated = [...accessoriesList, trimmed];
       setAccessoriesList(updated);
-      fetch('http://' + window.location.hostname + ':5000/api/settings/accessories_list', {
+      fetch(`${getBackendUrl()}/api/settings/accessories_list`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: updated })
@@ -1163,7 +1156,7 @@ export default function App() {
   const handleDeleteAccessory = (name) => {
     const updated = accessoriesList.filter(item => item !== name);
     setAccessoriesList(updated);
-    fetch('http://' + window.location.hostname + ':5000/api/settings/accessories_list', {
+    fetch(`${getBackendUrl()}/api/settings/accessories_list`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: updated })
@@ -1176,7 +1169,7 @@ export default function App() {
     if (!designersList.some(item => item.toLowerCase() === trimmed.toLowerCase())) {
       const updated = [...designersList, trimmed];
       setDesignersList(updated);
-      fetch('http://' + window.location.hostname + ':5000/api/settings/designers_list', {
+      fetch(`${getBackendUrl()}/api/settings/designers_list`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: updated })
@@ -1187,7 +1180,7 @@ export default function App() {
   const handleDeleteDesigner = (name) => {
     const updated = designersList.filter(item => item !== name);
     setDesignersList(updated);
-    fetch('http://' + window.location.hostname + ':5000/api/settings/designers_list', {
+    fetch(`${getBackendUrl()}/api/settings/designers_list`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value: updated })
@@ -1197,7 +1190,7 @@ export default function App() {
   const handleModalAutofillFromLot = async (lotNo) => {
     if (!lotNo) return;
     try {
-      const response = await fetch(`http://${window.location.hostname}:5000/api/lot/${lotNo}`);
+      const response = await fetch(`${getBackendUrl()}/api/lot/${lotNo}`);
       if (!response.ok) throw new Error('Failed to fetch lot details');
       const data = await response.json();
 

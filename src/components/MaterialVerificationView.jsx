@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ClipboardList, AlertTriangle, CheckSquare, CheckCircle, ArrowRight, Layers, HelpCircle, X, Shield, Send, Printer } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -63,7 +64,7 @@ export default function MaterialVerificationView({
 
     const fetchTotalPieces = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:5000/api/cutting/${selectedDesignId}`);
+        const response = await fetch(`${getBackendUrl()}/api/cutting/${selectedDesignId}`);
         if (response.ok) {
           const data = await response.json();
           if (data && data.rows && data.rows.length > 0) {

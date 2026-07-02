@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText, PlusCircle, Trash2, Download, RefreshCw,
@@ -213,7 +214,7 @@ export async function resolveLocalSystemUrl() {
   
   let serverIp = hostname;
   try {
-    const res = await fetch(`http://${hostname}:5000/api/public/server-ip`);
+    const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
     if (res.ok) {
       const data = await res.json();
       if (data.ip) {

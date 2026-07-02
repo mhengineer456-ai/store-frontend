@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 
@@ -545,7 +546,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     let maxSeq = 0;
     try {
       const hostname = window.location.hostname;
-      const res = await fetch(`http://${hostname}:5000/api/scans`);
+      const res = await fetch(`${getBackendUrl()}/api/scans`);
       if (res.ok) {
         const scans = await res.json();
         scans.forEach((s) => {
@@ -621,7 +622,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     setTrackerLogs([]);
     try {
       const hostname = window.location.hostname;
-      const res = await fetch(`http://${hostname}:5000/api/scans`);
+      const res = await fetch(`${getBackendUrl()}/api/scans`);
       if (!res.ok) throw new Error("Failed to fetch scan logs from server.");
       const data = await res.json();
       
@@ -656,7 +657,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     setTrackerLogs([]);
     try {
       const hostname = window.location.hostname;
-      const res = await fetch(`http://${hostname}:5000/api/scans`);
+      const res = await fetch(`${getBackendUrl()}/api/scans`);
       if (!res.ok) throw new Error("Failed to fetch scan logs from server.");
       const data = await res.json();
       
@@ -702,14 +703,14 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     
     try {
       // 1. Fetch design/BOM requirements
-      const designRes = await fetch(`http://${window.location.hostname}:5000/api/public/lot/${searchLotNo.trim()}`);
+      const designRes = await fetch(`${getBackendUrl()}/api/public/lot/${searchLotNo.trim()}`);
       let designData = null;
       if (designRes.ok) {
         designData = await designRes.json();
         setSearchedDesign(designData);
       } else {
         // Fallback: Fetch synced lot info
-        const lotRes = await fetch(`http://${window.location.hostname}:5000/api/lot/${searchLotNo.trim()}`);
+        const lotRes = await fetch(`${getBackendUrl()}/api/lot/${searchLotNo.trim()}`);
         if (lotRes.ok) {
           const lotData = await lotRes.json();
           designData = {
@@ -725,7 +726,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       }
       
       // 2. Fetch cutting matrix
-      const cuttingRes = await fetch(`http://${window.location.hostname}:5000/api/cutting/${searchLotNo.trim()}`);
+      const cuttingRes = await fetch(`${getBackendUrl()}/api/cutting/${searchLotNo.trim()}`);
       if (cuttingRes.ok) {
         const cuttingData = await cuttingRes.json();
         setSearchedMatrix(cuttingData);
@@ -1045,7 +1046,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
           supplier_name: form.vendor || 'N/A',
           rgp_payload: JSON.stringify(finalPayload)
         };
-        const response = await fetch(`http://${hostname}:5000/api/scans`, {
+        const response = await fetch(`${getBackendUrl()}/api/scans`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(scanPayload)
@@ -1090,7 +1091,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       if (isLocalHostOrIP) {
         let serverIp = window.location.hostname;
         try {
-          const res = await fetch(`http://${window.location.hostname}:5000/api/public/server-ip`);
+          const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
           if (res.ok) {
             const data = await res.json();
             if (data.ip) {
@@ -1159,7 +1160,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       if (isLocalHostOrIP) {
         let serverIp = window.location.hostname;
         try {
-          const res = await fetch(`http://${window.location.hostname}:5000/api/public/server-ip`);
+          const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
           if (res.ok) {
             const data = await res.json();
             if (data.ip) {

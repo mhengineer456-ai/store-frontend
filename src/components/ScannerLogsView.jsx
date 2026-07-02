@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { Search, RotateCcw, Calendar, User, Package, Truck, ShieldAlert } from 'lucide-react';
 
@@ -7,10 +8,7 @@ export default function ScannerLogsView({ currencySymbol = 'R' }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
 
-  const getBackendUrl = () => {
-    const hostname = window.location.hostname;
-    return `http://${hostname}:5000`;
-  };
+  
 
   const fetchLogs = () => {
     setLoading(true);

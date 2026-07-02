@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Download, Search, FileText, Truck, Calendar, User, 
@@ -73,7 +74,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       const hostname = window.location.hostname;
       
       // 1. Fetch Standard POs
-      const poRes = await fetch(`http://${hostname}:5000/api/pos`);
+      const poRes = await fetch(`${getBackendUrl()}/api/pos`);
       if (poRes.ok) {
         const posData = await poRes.json();
         posData.sort((a, b) => b.poNumber.localeCompare(a.poNumber));
@@ -81,7 +82,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       }
 
       // 2. Fetch Zip PO cutting headers
-      const zipRes = await fetch(`http://${hostname}:5000/api/cutting-headers`);
+      const zipRes = await fetch(`${getBackendUrl()}/api/cutting-headers`);
       if (zipRes.ok) {
         const zipData = await zipRes.json();
         zipData.sort((a, b) => (b.Lot_Number || '').localeCompare(a.Lot_Number || ''));
@@ -89,7 +90,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       }
 
       // 3. Fetch Dori PO orders
-      const doriRes = await fetch(`http://${hostname}:5000/api/doori-orders`);
+      const doriRes = await fetch(`${getBackendUrl()}/api/doori-orders`);
       if (doriRes.ok) {
         const doriData = await doriRes.json();
         doriData.sort((a, b) => (b.Lot_Number || '').localeCompare(a.Lot_Number || ''));
@@ -97,7 +98,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       }
 
       // 4. Fetch RGP scans (scan_type = 'rgp_entry')
-      const scansRes = await fetch(`http://${hostname}:5000/api/scans`);
+      const scansRes = await fetch(`${getBackendUrl()}/api/scans`);
       if (scansRes.ok) {
         const scansData = await scansRes.json();
         const rgps = scansData
@@ -224,7 +225,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
   const fetchMatrix = async (lotNo) => {
     try {
       const hostname = window.location.hostname;
-      const res = await fetch(`http://${hostname}:5000/api/cutting/${lotNo}`);
+      const res = await fetch(`${getBackendUrl()}/api/cutting/${lotNo}`);
       if (res.ok) {
         const data = await res.json();
         const sizeKeys = ['M', 'L', 'XL', 'XXL'];
@@ -381,7 +382,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       if (isLocalHostOrIP) {
         let serverIp = hostname;
         try {
-          const res = await fetch(`http://${hostname}:5000/api/public/server-ip`);
+          const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
           if (res.ok) {
             const data = await res.json();
             if (data.ip) serverIp = data.ip;
@@ -593,7 +594,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       if (isLocalHostOrIP) {
         let serverIp = hostname;
         try {
-          const res = await fetch(`http://${hostname}:5000/api/public/server-ip`);
+          const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
           if (res.ok) {
             const data = await res.json();
             if (data.ip) serverIp = data.ip;

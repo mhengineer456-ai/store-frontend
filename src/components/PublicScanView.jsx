@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { QrCode, User, Check, AlertCircle, ArrowLeft, Loader2, Package, Truck, Layers } from 'lucide-react';
 
@@ -28,14 +29,7 @@ export default function PublicScanView({ initialAction = '', initialLot = '', in
   const [errorMessage, setErrorMessage] = useState('');
 
   // Get dynamic backend URL depending on browser host
-  const getBackendUrl = () => {
-    const hostname = window.location.hostname;
-    const port = window.location.port;
-    if (!port || port === '5000') {
-      return window.location.origin;
-    }
-    return `http://${hostname}:5000`;
-  };
+  
 
   // Map URL actions to dropdown scan types
   useEffect(() => {

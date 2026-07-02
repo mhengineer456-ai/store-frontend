@@ -1,3 +1,4 @@
+import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect } from 'react';
 import { ClipboardList, AlertTriangle, CheckCircle, ArrowRight, Layers, HelpCircle, Printer, Trash2, Plus, RotateCcw, X, PrinterCheck, Shield, Send } from 'lucide-react';
 import { jsPDF } from 'jspdf';
@@ -183,7 +184,7 @@ export default function MaterialIssueView({
 
     const fetchTotalPieces = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:5000/api/cutting/${selectedDesignId}`);
+        const response = await fetch(`${getBackendUrl()}/api/cutting/${selectedDesignId}`);
         if (response.ok) {
           const data = await response.json();
           if (data && data.rows && data.rows.length > 0) {
