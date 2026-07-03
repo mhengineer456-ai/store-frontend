@@ -1,5 +1,5 @@
 import { getBackendUrl } from '../utils/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ClipboardList, AlertTriangle, CheckCircle, ArrowRight, Layers, HelpCircle, Printer, Trash2, Plus, RotateCcw, X, PrinterCheck, Shield, Send } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
@@ -34,7 +34,12 @@ export default function MaterialIssueView({
   const [isOpen, setIsOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [pieces, setPieces] = useState(100);
+  const [isLoadingPieces, setIsLoadingPieces] = useState(false);
   const [bomMappings, setBomMappings] = useState([]);
+
+  // Lock refs to prevent re-fetching or resetting form when background polling occurs
+  const fetchedLotIdRef = useRef('');
+  const mappedLotIdRef = useRef('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [returnError, setReturnError] = useState('');
@@ -173,16 +178,23 @@ export default function MaterialIssueView({
     ? getLotIssueStatus(selectedDesign) === 'completed'
     : false;
 
-  // Fetch total pieces cut from database for the selected lot and prefill pieces
+  // Fetch total pieces cut from database for the selected lot and prefill pieces (ONE TIME PER LOT SELECTION)
   useEffect(() => {
-    if (!selectedDesignId) return;
+    if (!selectedDesignId) {
+      fetchedLotIdRef.current = '';
+      setIsLoadingPieces(false);
+      return;
+    }
 
-    // Set fallback SQLite design quantity first
-    if (selectedDesign && selectedDesign.quantity && selectedDesign.quantity > 0) {
-      setPieces(selectedDesign.quantity);
+    // Only fetch once per selected lot ID
+    if (fetchedLotIdRef.current === selectedDesignId) {
+      return;
     }
 
     const fetchTotalPieces = async () => {
+      setIsLoadingPieces(true);
+      fetchedLotIdRef.current = selectedDesignId;
+      let finalPieces = selectedDesign?.quantity || 100;
       try {
         const response = await fetch(`${getBackendUrl()}/api/cutting/${selectedDesignId}`);
         if (response.ok) {
@@ -190,24 +202,34 @@ export default function MaterialIssueView({
           if (data && data.rows && data.rows.length > 0) {
             const totalPcs = data.rows.reduce((sum, row) => sum + (row.totalPcs || 0), 0);
             if (totalPcs > 0) {
-              setPieces(totalPcs);
+              finalPieces = totalPcs;
             }
           }
         }
       } catch (err) {
         console.warn('Failed to fetch total pieces from local API, falling back:', err.message);
+      } finally {
+        setPieces(finalPieces);
+        setIsLoadingPieces(false);
       }
     };
 
     fetchTotalPieces();
-  }, [selectedDesignId, selectedDesign]);
+  }, [selectedDesignId]);
 
-  // Auto-generate mappings when design is selected or pieces input changes
+  // Auto-generate mappings when design is selected or issueMode changes (ONE TIME PER LOT / MODE SELECTION)
   useEffect(() => {
     if (!selectedDesign || !selectedDesign.bom) {
+      mappedLotIdRef.current = '';
       setBomMappings([]);
       return;
     }
+
+    const mappingKey = `${selectedDesignId}_${issueMode}`;
+    if (mappedLotIdRef.current === mappingKey) {
+      return;
+    }
+    mappedLotIdRef.current = mappingKey;
 
     // Extract issued components for this lot (only for initial mode)
     const logs = issueLogs.filter(log => String(log.lotId) === String(selectedDesign.id) && !log.isReissue);
@@ -335,7 +357,7 @@ export default function MaterialIssueView({
     setBomMappings(initialMappings);
     setFormError('');
     setFormSuccess('');
-  }, [selectedDesignId, materials, issueMode, issueLogs]);
+  }, [selectedDesignId, issueMode, selectedDesign]);
 
   const handleMappingChange = (index, field, value) => {
     const updated = [...bomMappings];
@@ -936,14 +958,17 @@ export default function MaterialIssueView({
                 type="number"
                 className="form-input"
                 min="1"
-                placeholder="e.g. 500"
-                value={pieces}
+                placeholder={isLoadingPieces ? "Fetching..." : "e.g. 500"}
+                value={isLoadingPieces ? "" : pieces}
                 onChange={(e) => setPieces(Math.max(1, Number(e.target.value)))}
-                disabled={isSelectedDesignAlreadyIssued}
+                disabled={isSelectedDesignAlreadyIssued || isLoadingPieces}
                 required
               />
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                Scales required BOM quantities automatically based on unit consumption rates.
+                {isLoadingPieces
+                  ? "Retrieving pieces count from cutting logs..."
+                  : "Scales required BOM quantities automatically based on unit consumption rates."
+                }
               </span>
             </div>
 
@@ -1016,6 +1041,19 @@ export default function MaterialIssueView({
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px', color: 'var(--text-muted)', textAlign: 'center' }}>
               <HelpCircle size={48} strokeWidth={1} style={{ marginBottom: '12px' }} />
               <p style={{ fontSize: '14px', fontWeight: '500' }}>Select an approved design lot on the left to analyze production material needs.</p>
+            </div>
+          ) : isLoadingPieces ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px', color: 'var(--text-muted)', textAlign: 'center' }}>
+              <div className="spinner-loader" style={{
+                border: '4px solid rgba(0, 0, 0, 0.1)',
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                borderLeftColor: 'var(--accent-color)',
+                animation: 'spin 1.2s linear infinite',
+                marginBottom: '16px'
+              }} />
+              <p style={{ fontSize: '14px', fontWeight: '500' }}>Analyzing production specifications & cutting reports...</p>
             </div>
           ) : (
             <div>

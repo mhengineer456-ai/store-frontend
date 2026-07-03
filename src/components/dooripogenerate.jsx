@@ -1965,6 +1965,33 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
         abortRef.current = ctrl;
 
         try {
+            // Verify design approval status
+            const designRes = await fetch(`${getBackendUrl()}/api/designs`, { signal: ctrl.signal });
+            if (!designRes.ok) throw new Error('Failed to verify design status.');
+            const designsList = await designRes.json();
+            const matchingDesign = designsList.find(d => 
+                String(d.id).toLowerCase() === normalizedLot.toLowerCase() ||
+                String(d.name).toLowerCase() === normalizedLot.toLowerCase() ||
+                (d.lotNo2 && String(d.lotNo2).toLowerCase() === normalizedLot.toLowerCase())
+            );
+
+            if (!matchingDesign) {
+                // Check if cutting matrix header data exists for this lot
+                const cuttingRes = await fetch(`${getBackendUrl()}/api/cutting/${normalizedLot}`, { signal: ctrl.signal });
+                let hasCutting = false;
+                if (cuttingRes.ok) {
+                    const cData = await cuttingRes.json();
+                    if (cData && (cData.header || (cData.rows && cData.rows.length > 0))) {
+                        hasCutting = true;
+                    }
+                }
+                if (!hasCutting) {
+                    throw new Error(`Design lot #${normalizedLot} has not been created in the system yet.`);
+                }
+            } else if (matchingDesign.status !== 'Approved') {
+                throw new Error(`Design lot #${normalizedLot} is currently "${matchingDesign.status}". It must be approved before compiling a Thread/Doori PO.`);
+            }
+
             // Check cache first
             const cacheKey = `lot_${normalizedLot}`;
             const cachedMatrix = getCached(cacheKey);
@@ -3320,7 +3347,7 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
                     {/* Quick suggestion chips */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '4px', fontWeight: '500' }}>Recent Lots:</span>
-                        {['11202', '11028', '11030', '11033', '11034'].map(lot => (
+                        {['11001', '11028', '11030', '11033', '11034'].map(lot => (
                             <button
                                 key={lot}
                                 type="button"
@@ -4552,6 +4579,7 @@ export function DoriDashboard({ onCompileNewPO }) {
                             <tr>
                                 <th style={{ width: '40px', textAlign: 'center' }}>Sr. No.</th>
                                 <th>Lot No.</th>
+                                <th>Run Version</th>
                                 <th>Garment Type</th>
                                 <th>Style</th>
                                 <th>Pieces</th>
@@ -4568,17 +4596,23 @@ export function DoriDashboard({ onCompileNewPO }) {
                         <tbody>
                             {paginatedPOs.length === 0 ? (
                                 <tr>
-                                    <td colSpan="13" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+                                    <td colSpan="14" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
                                         No purchase orders found matching the filter criteria.
                                     </td>
                                 </tr>
                             ) : (
                                 paginatedPOs.map((po, index) => {
                                     const serialNo = (currentPage - 1) * rowsPerPage + index + 1;
+                                    const verInfo = getLotVersionInfo(po.lotNumber);
                                     return (
                                         <tr key={po.lotNumber}>
                                             <td style={{ textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)' }}>{serialNo}</td>
-                                            <td style={{ fontWeight: '700', color: 'var(--warning)' }}>{po.lotNumber}</td>
+                                            <td style={{ fontWeight: '700', color: 'var(--warning)' }}>{verInfo.displayLot}</td>
+                                            <td>
+                                                <span className={`status-badge ${verInfo.isRecreated ? 'in-verification' : 'approved'}`} style={{ fontSize: '11px', padding: '3px 8px', textTransform: 'none' }}>
+                                                    {verInfo.versionText}
+                                                </span>
+                                            </td>
                                             <td style={{ fontWeight: '600' }}>
                                                 {po.garmentType}
                                                 {po.fabric && <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '2px' }}>{po.fabric}</span>}
@@ -4760,8 +4794,9 @@ const calculateAging = (issueDateStr, gateDateStr, matDateStr, supDateStr) => {
 const formatDate = (dateStr) => {
     if (!dateStr) return '';
     try {
-        if (dateStr.includes('-')) {
-            const parts = dateStr.trim().split('-');
+        const dateOnlyStr = dateStr.includes(' ') ? dateStr.split(' ')[0] : dateStr.trim();
+        if (dateOnlyStr.includes('-')) {
+            const parts = dateOnlyStr.split('-');
             if (parts.length === 3) {
                 if (parts[0].length === 4) {
                     return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
@@ -4775,4 +4810,21 @@ const formatDate = (dateStr) => {
     } catch {
         return dateStr;
     }
+};
+
+const getLotVersionInfo = (lotNo) => {
+    const lotStr = String(lotNo || '').trim();
+    if (lotStr.includes('-V')) {
+        const parts = lotStr.split('-V');
+        return {
+            displayLot: parts[0],
+            versionText: `Recreated (Run ${parts[1]})`,
+            isRecreated: true
+        };
+    }
+    return {
+        displayLot: lotStr,
+        versionText: 'Original (Run 1)',
+        isRecreated: false
+    };
 };

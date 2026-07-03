@@ -707,22 +707,20 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       let designData = null;
       if (designRes.ok) {
         designData = await designRes.json();
+        
+        // Enforce design approval check
+        if (designData.status !== 'Approved') {
+          setSearchError(`Design lot #${searchLotNo.trim()} is currently "${designData.status || 'Pending'}". It must be approved before creating an RGP.`);
+          setSearchLoading(false);
+          return;
+        }
+        
         setSearchedDesign(designData);
       } else {
-        // Fallback: Fetch synced lot info
-        const lotRes = await fetch(`${getBackendUrl()}/api/lot/${searchLotNo.trim()}`);
-        if (lotRes.ok) {
-          const lotData = await lotRes.json();
-          designData = {
-            id: lotData.lotNo,
-            style: lotData.style,
-            brand: lotData.brand,
-            category: lotData.garmentType,
-            quantity: lotData.quantity,
-            bom: []
-          };
-          setSearchedDesign(designData);
-        }
+        // Design not registered in system DB yet
+        setSearchError(`Design lot #${searchLotNo.trim()} has not been created or approved in the system yet.`);
+        setSearchLoading(false);
+        return;
       }
       
       // 2. Fetch cutting matrix

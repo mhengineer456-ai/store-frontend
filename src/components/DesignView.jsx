@@ -657,6 +657,7 @@ export default function DesignView({
 
     const newDesign = {
       id: finalId,
+      isEdit: !!editingDesignId,
       name: finalId, // Lot No serves as primary identifier / name
       lotNo2: lotNo2.trim() || 'N/A',
       brand: brand.trim() || 'Custom Brand',
@@ -1252,7 +1253,7 @@ export default function DesignView({
                         fontFamily: 'var(--font-family-title)',
                         letterSpacing: '0.04em'
                       }}>
-                        #{design.id}
+                        #{getLotVersionInfo(design.id).displayLot}
                       </div>
                       <span
                         className={`status-badge ${design.status.toLowerCase().replace(/\s+/g, '-')}`}
@@ -1263,9 +1264,26 @@ export default function DesignView({
                     </div>
                     <div className="design-card-info">
                       <h3 className="design-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', fontFamily: 'monospace' }}>LOT</span>
-                          <span>{design.id}</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', fontFamily: 'monospace' }}>LOT</span>
+                            <span style={{ fontWeight: 'bold' }}>{getLotVersionInfo(design.id).displayLot}</span>
+                          </div>
+                          {getLotVersionInfo(design.id).isRecreated && (
+                            <span style={{
+                              fontSize: '9px',
+                              backgroundColor: 'var(--warning)',
+                              color: '#fff',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              fontWeight: '700',
+                              marginTop: '3px',
+                              textTransform: 'none',
+                              display: 'inline-block'
+                            }}>
+                              {getLotVersionInfo(design.id).versionText}
+                            </span>
+                          )}
                         </div>
                         {design.style && (
                           <span
@@ -1745,3 +1763,20 @@ export default function DesignView({
     </div>
   );
 }
+
+const getLotVersionInfo = (lotNo) => {
+  const lotStr = String(lotNo || '').trim();
+  if (lotStr.includes('-V')) {
+    const parts = lotStr.split('-V');
+    return {
+      displayLot: parts[0],
+      versionText: `Recreated (Run ${parts[1]})`,
+      isRecreated: true
+    };
+  }
+  return {
+    displayLot: lotStr,
+    versionText: 'Original (Run 1)',
+    isRecreated: false
+  };
+};

@@ -430,7 +430,12 @@ export default function App() {
             }
             return b.id.localeCompare(a.id);
           });
-          setDesigns(sorted);
+          setDesigns(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(sorted)) {
+              return prev;
+            }
+            return sorted;
+          });
         }
       } catch (err) {
         console.error('Failed to fetch designs from DB:', err);
@@ -466,7 +471,12 @@ export default function App() {
         const response = await fetch(`${getBackendUrl()}/api/approval-requests`);
         if (response.ok) {
           const data = await response.json();
-          setApprovalRequests(data);
+          setApprovalRequests(prev => {
+            if (JSON.stringify(prev) === JSON.stringify(data)) {
+              return prev;
+            }
+            return data;
+          });
         }
       } catch (err) {
         console.error('Failed to fetch approval requests from DB:', err);
