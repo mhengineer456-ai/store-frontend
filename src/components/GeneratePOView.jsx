@@ -58,23 +58,24 @@ const fmtMoney = (n) =>
   });
 
 function generateNextPoNumber(existingPoNumbers) {
-  const parsedNumbers = new Set();
+  const parsedNumbers = [];
   if (Array.isArray(existingPoNumbers)) {
     existingPoNumbers.forEach(poStr => {
       if (poStr) {
         const match = poStr.match(/\d+/);
         if (match) {
-          parsedNumbers.add(parseInt(match[0], 10));
+          parsedNumbers.push(parseInt(match[0], 10));
         }
       }
     });
   }
   
-  let candidate = 1000;
-  while (parsedNumbers.has(candidate)) {
-    candidate++;
+  if (parsedNumbers.length === 0) {
+    return 'PO-1000';
   }
-  return `PO-${candidate}`;
+  
+  const maxNum = Math.max(...parsedNumbers);
+  return `PO-${maxNum + 1}`;
 }
 
 const blankRow = () => ({
@@ -198,20 +199,20 @@ async function fetchAllPONumbers(sheetId, apiKey) {
 
 export async function resolveLocalSystemUrl() {
   const hostname = window.location.hostname;
-  
+
   // Check if we are browsing via a local host address
-  const isLocalHostOrIP = 
-    hostname === 'localhost' || 
-    hostname === '127.0.0.1' || 
-    hostname.startsWith('192.168.') || 
-    hostname.startsWith('10.') || 
+  const isLocalHostOrIP =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
     hostname.startsWith('172.');
-    
+
   if (!isLocalHostOrIP) {
     // We are on a public domain/tunnelling address (e.g. ngrok, public domain), use origin directly
     return `${window.location.origin}/`;
   }
-  
+
   let serverIp = hostname;
   try {
     const res = await fetch(`${getBackendUrl()}/api/public/server-ip`);
@@ -267,36 +268,7 @@ function setLocalStorageItem(key, value) {
 /** =========================
  * Save autocomplete debouncers
  * ========================= */
-let saveDescriptionTimeout = null;
-let saveShadeTimeout = null;
-
-function saveDescriptionWithDebounce(description) {
-  if (!description || !description.trim()) return;
-  if (saveDescriptionTimeout) clearTimeout(saveDescriptionTimeout);
-  saveDescriptionTimeout = setTimeout(() => {
-    const trimmedValue = description.trim();
-    if (trimmedValue.length < 2) return;
-    const savedItems = getLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, []);
-    if (!savedItems.includes(trimmedValue)) {
-      const updatedItems = [trimmedValue, ...savedItems.filter(item => item !== trimmedValue)];
-      setLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, updatedItems.slice(0, 50));
-    }
-  }, 1500);
-}
-
-function saveShadeWithDebounce(shade) {
-  if (!shade || !shade.trim()) return;
-  if (saveShadeTimeout) clearTimeout(saveShadeTimeout);
-  saveShadeTimeout = setTimeout(() => {
-    const trimmedValue = shade.trim();
-    if (trimmedValue.length < 2) return;
-    const savedItems = getLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, []);
-    if (!savedItems.includes(trimmedValue)) {
-      const updatedItems = [trimmedValue, ...savedItems.filter(item => item !== trimmedValue)];
-      setLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, updatedItems.slice(0, 50));
-    }
-  }, 1500);
-}
+// Autocomplete savers will be defined inside Component scope for state interaction.
 
 function saveNameToLocalStorage(key, name) {
   if (!name || !name.trim()) return;
@@ -900,7 +872,7 @@ function SmartDropdown({
   };
 
   return (
-    <div className="smart-dropdown" ref={dropdownRef} style={{ position: 'relative' }}>
+    <div className="smart-dropdown" ref={dropdownRef} style={{ position: 'relative', zIndex: isOpen ? 9999 : 1 }}>
       <input
         type="text"
         className={`form-input ${required && !value ? 'required-field' : ''}`}
@@ -1116,9 +1088,46 @@ export default function GeneratePOView({
   onAddPO,
   currencySymbol = 'R',
   prefilledPoData = null,
-  setPrefilledPoData = () => { }
+  setPrefilledPoData = () => { },
+  materials = []
 }) {
   const approvedDesigns = designs.filter(d => d.status === 'Approved');
+
+  const [historyLogs, setHistoryLogs] = useState([]);
+  
+  useEffect(() => {
+    fetch(`${getBackendUrl()}/api/design-history`)
+      .then(res => {
+        if (res.ok) return res.json();
+        return [];
+      })
+      .then(data => setHistoryLogs(data))
+      .catch(err => console.error(err));
+  }, []);
+
+  const getDesignHistoryLogs = () => {
+    if (!selectedDesignId) return [];
+    const logs = [];
+    const designObj = approvedDesigns.find(d => String(d.id) === String(selectedDesignId));
+    
+    // Find logs matching current lot ID
+    historyLogs.forEach(h => {
+      if (String(h.lotId).toLowerCase() === String(selectedDesignId).toLowerCase()) {
+        logs.push(h);
+      }
+    });
+
+    // Find logs matching repeat_against parent lot ID if exists
+    if (designObj && designObj.repeat_against) {
+      historyLogs.forEach(h => {
+        if (String(h.lotId).toLowerCase() === String(designObj.repeat_against).toLowerCase()) {
+          logs.push(h);
+        }
+      });
+    }
+
+    return logs;
+  };
 
   const [poNumber, setPoNumber] = useState("PO-1000");
   const [orderDate, setOrderDate] = useState(todayISO());
@@ -1164,6 +1173,39 @@ export default function GeneratePOView({
     getLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, [])
   );
 
+  // Real-time Autocomplete state savers
+  const saveDescriptionWithDebounce = (description) => {
+    if (!description || !description.trim()) return;
+    window.saveDescriptionTimeout = window.saveDescriptionTimeout || null;
+    if (window.saveDescriptionTimeout) clearTimeout(window.saveDescriptionTimeout);
+    window.saveDescriptionTimeout = setTimeout(() => {
+      const trimmedValue = description.trim();
+      if (trimmedValue.length < 2) return;
+      const savedItems = getLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, []);
+      if (!savedItems.includes(trimmedValue)) {
+        const updatedItems = [trimmedValue, ...savedItems.filter(item => item !== trimmedValue)];
+        setLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, updatedItems.slice(0, 50));
+        setSavedDescriptions(updatedItems.slice(0, 50)); // Live React sync
+      }
+    }, 800);
+  };
+
+  const saveShadeWithDebounce = (shade) => {
+    if (!shade || !shade.trim()) return;
+    window.saveShadeTimeout = window.saveShadeTimeout || null;
+    if (window.saveShadeTimeout) clearTimeout(window.saveShadeTimeout);
+    window.saveShadeTimeout = setTimeout(() => {
+      const trimmedValue = shade.trim();
+      if (trimmedValue.length < 2) return;
+      const savedItems = getLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, []);
+      if (!savedItems.includes(trimmedValue)) {
+        const updatedItems = [trimmedValue, ...savedItems.filter(item => item !== trimmedValue)];
+        setLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, updatedItems.slice(0, 50));
+        setSavedShades(updatedItems.slice(0, 50)); // Live React sync
+      }
+    }, 800);
+  };
+
   const [gstEnabled, setGstEnabled] = useState(() =>
     getLocalStorageItem(LOCAL_STORAGE_KEYS.GST_ENABLED, false)
   );
@@ -1178,6 +1220,15 @@ export default function GeneratePOView({
 
   const [selectedDesignId, setSelectedDesignId] = useState('');
   const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
+  const [poMode, setPoMode] = useState('lot'); // 'lot' | 'normal'
+
+  const handlePoModeChange = (mode) => {
+    setPoMode(mode);
+    if (mode === 'normal') {
+      setSelectedDesignId('');
+      setRows([blankRow()]);
+    }
+  };
 
   // Left editor active steps tab state
   const [leftActiveTab, setLeftActiveTab] = useState('specs');
@@ -1224,6 +1275,10 @@ export default function GeneratePOView({
       setPrefilledPoData(null);
     }
   }, [prefilledPoData, setPrefilledPoData]);
+
+  const makeUniquePoNumber = () => {
+    return generateNextPoNumber(availablePONumbers);
+  };
 
   // Approved Design autofill mapping
   const handleDesignChange = (designId) => {
@@ -1389,8 +1444,14 @@ export default function GeneratePOView({
 
   const resetForm = () => {
     setPoNumber(prev => {
-      const match = prev.match(/\d+/);
-      const nextNum = match ? parseInt(match[0], 10) + 1 : 10000;
+      const match = prev ? prev.match(/\d+/) : null;
+      const currentNum = match ? parseInt(match[0], 10) : 1000;
+      const parsedNumbers = availablePONumbers.map(poStr => {
+        const m = poStr ? poStr.match(/\d+/) : null;
+        return m ? parseInt(m[0], 10) : 0;
+      });
+      const maxNum = parsedNumbers.length > 0 ? Math.max(...parsedNumbers) : 1000;
+      const nextNum = Math.max(currentNum, maxNum) + 1;
       return `PO-${nextNum}`;
     });
     setOrderDate(todayISO());
@@ -1402,6 +1463,8 @@ export default function GeneratePOView({
     setSupplierEmail("");
     setSupplierPhone("");
     setRows([blankRow()]);
+    setSelectedDesignId("");
+    setPoMode("lot");
     setRequisitionRaisedBy("");
     setPreparedBy("");
     setApprovedBy("");
@@ -1824,18 +1887,42 @@ export default function GeneratePOView({
             {/* TAB 1: Specs & Ref */}
             {leftActiveTab === 'specs' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div className="po-grid-2">
-                  <div>
-                    <label className="FormLabel">Approved Design (Lot)</label>
-                    <SearchableDesignSelect
-                      designs={approvedDesigns}
-                      value={selectedDesignId}
-                      onChange={handleDesignChange}
-                      placeholder="-- Choose Approved Lot --"
-                    />
+                <div style={{ marginBottom: '4px' }}>
+                  <label className="FormLabel" style={{ display: 'block', marginBottom: '8px' }}>Purchase Order Mode</label>
+                  <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
+                    <button
+                      type="button"
+                      className={`btn ${poMode === 'lot' ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => handlePoModeChange('lot')}
+                      style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', height: 'auto', minHeight: 'unset', color: poMode === 'lot' ? '#fff' : 'var(--text-color)' }}
+                    >
+                      Against Lot
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${poMode === 'normal' ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => handlePoModeChange('normal')}
+                      style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', height: 'auto', minHeight: 'unset', color: poMode === 'normal' ? '#fff' : 'var(--text-color)' }}
+                    >
+                      Normal PO
+                    </button>
                   </div>
+                </div>
 
-                  <div>
+                <div className="po-grid-2">
+                  {poMode === 'lot' && (
+                    <div>
+                      <label className="FormLabel">Approved Design (Lot)</label>
+                      <SearchableDesignSelect
+                        designs={approvedDesigns}
+                        value={selectedDesignId}
+                        onChange={handleDesignChange}
+                        placeholder="-- Choose Approved Lot --"
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ gridColumn: poMode === 'lot' ? 'span 1' : 'span 2' }}>
                     <label className="FormLabel">Vendor Profile</label>
                     <select
                       className="FilterSelect"
@@ -1898,6 +1985,33 @@ export default function GeneratePOView({
                 {leadHuman && (
                   <div style={{ fontSize: '12px', background: 'var(--accent-light)', padding: '6px 12px', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: '600', alignSelf: 'start' }}>
                     Expected Lead Time: {leadHuman}
+                  </div>
+                )}
+                {selectedDesignId && (
+                  <div style={{ marginTop: '10px', borderTop: '1.5px solid var(--border-color, #e2e8f0)', paddingTop: '14px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', display: 'block', marginBottom: '8px', letterSpacing: '0.04em' }}>
+                      📋 Design Lot Activity Log & Repeat History
+                    </span>
+                    {getDesignHistoryLogs().length === 0 ? (
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No history logs found for this lot.
+                      </span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', paddingRight: '4px' }}>
+                        {getDesignHistoryLogs().map((log, lIdx) => (
+                          <div key={lIdx} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-secondary, #f8fafc)', display: 'flex', flexDirection: 'column', gap: '2px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: '800', color: 'var(--accent-color, #6366f1)', textTransform: 'uppercase', fontSize: '9px' }}>
+                                {log.action} {String(log.lotId) !== String(selectedDesignId) ? `(Lot #${log.lotId})` : ''}
+                              </span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>{log.timestamp}</span>
+                            </div>
+                            <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{log.details}</span>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>Operator: {log.actorName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2080,7 +2194,7 @@ export default function GeneratePOView({
               </div>
 
               {/* Paper Items Table */}
-              <div className="custom-table-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+              <div className="custom-table-container" style={{ overflow: 'visible' }}>
                 <table className="custom-table" style={{ background: 'transparent' }}>
                   <thead>
                     <tr>
@@ -2098,14 +2212,42 @@ export default function GeneratePOView({
                   <tbody>
                     {rows.map((row, idx) => {
                       const rowAmt = (+row.qty || 0) * (+row.rate || 0);
-                      const deptItems = itemsByDept[row.department] || [];
+                      
+                      let dropdownOptions = [];
+                      const designItems = (designs || []).flatMap(d => d.bom || []);
+                      
+                      if (row.department) {
+                        const deptLower = row.department.toLowerCase().trim();
+                        const sheetItems = itemsByDept[row.department] || [];
+                        const bomItems = designItems
+                          .filter(item => (item.category || 'Trims').toLowerCase().trim() === deptLower)
+                          .map(item => item.name);
+                        const catItems = (materials || [])
+                          .filter(m => (m.category || 'Trims').toLowerCase().trim() === deptLower)
+                          .map(m => m.name);
+                        dropdownOptions = [...sheetItems, ...bomItems, ...catItems];
+                      } else {
+                        const sheetItems = sheetRows.map(r => r.item).filter(Boolean);
+                        const bomItems = designItems.map(item => item.name);
+                        const catItems = (materials || []).map(m => m.name);
+                        dropdownOptions = [...sheetItems, ...bomItems, ...catItems];
+                      }
+                      
+                      const cleanDropdownOptions = Array.from(new Set(dropdownOptions.filter(Boolean)));
+                      const finalOptions = Array.from(new Set([...cleanDropdownOptions, ...savedDescriptions])).sort((a, b) => a.localeCompare(b));
+
                       return (
                         <tr key={idx}>
                           <td style={{ textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', padding: '8px' }}>{idx + 1}</td>
                           <td style={{ padding: '8px' }}>
                             <select
                               value={row.department}
-                              onChange={e => updateRow(idx, { department: e.target.value, description: "" })}
+                              onChange={e => {
+                                const newDept = e.target.value;
+                                const matchedRow = sheetRows.find(r => String(r.item).toLowerCase().trim() === String(row.description).toLowerCase().trim());
+                                const keepDescription = matchedRow && matchedRow.dept === newDept;
+                                updateRow(idx, { department: newDept, description: keepDescription ? row.description : "" });
+                              }}
                               style={{ padding: '4px 6px', fontSize: '12px' }}
                             >
                               <option value="">Dept</option>
@@ -2121,10 +2263,15 @@ export default function GeneratePOView({
                             <SmartDropdown
                               value={row.description}
                               onChange={val => {
-                                updateRow(idx, { description: val });
+                                const matchedRow = sheetRows.find(r => String(r.item).toLowerCase().trim() === String(val).toLowerCase().trim());
+                                const extraUpdate = {};
+                                if (matchedRow && matchedRow.dept) {
+                                  extraUpdate.department = matchedRow.dept;
+                                }
+                                updateRow(idx, { description: val, ...extraUpdate });
                                 saveDescriptionWithDebounce(val);
                               }}
-                              options={deptItems.length > 0 ? deptItems : savedDescriptions}
+                              options={finalOptions}
                               placeholder="Type item..."
                               localStorageKey={LOCAL_STORAGE_KEYS.DESCRIPTIONS}
                               onSaveToLocalStorage={() => setSavedDescriptions(getLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, []))}

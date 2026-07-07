@@ -1241,6 +1241,7 @@ const saveOrderToSheet = async (matrix, formData, totalCost) => {
 // ============================
 // Optimized React Component
 // ============================
+// eslint-disable-next-line react-refresh/only-export-components
 export const generateIssuePdf = async (matrix, {
     issueDate,
     supervisor,
@@ -1250,7 +1251,8 @@ export const generateIssuePdf = async (matrix, {
     placementQuantities,
     placementZipTypes,
     zipQualityData,
-    blockedShades
+    blockedShades,
+    poNumber
 }) => {
     if (!matrix) return;
 
@@ -1412,7 +1414,16 @@ export const generateIssuePdf = async (matrix, {
         const lotNumberText = cleanString(matrix.lotNumber || 'LOT NO. UNKNOWN');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(18);
-        doc.text(`LOT NO: ${lotNumberText}`, centerPoint, headerTitleY + 45, { align: 'center' });
+        doc.text(`LOT NO: ${lotNumberText}`, centerPoint, headerTitleY + 40, { align: 'center' });
+
+        // Show PO Number prominently
+        if (poNumber) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(0, 80, 180);
+            doc.text(`PO NO: ${poNumber}`, centerPoint, headerTitleY + 58, { align: 'center' });
+            doc.setTextColor(0);
+        }
 
         const fieldsY = boxY + boxSize + 15;
         const fieldH = 20;
@@ -1789,7 +1800,9 @@ export const generateIssuePdf = async (matrix, {
     drawFooterWithSignatures();
     drawSimpleFooter(currentPage, pageCount);
 
-    const fname = `Lot_${cleanString(matrix.lotNumber || 'Unknown')}_Purchase_Order_${filenameDatePart(issueDate)}.pdf`;
+    const fname = poNumber
+        ? `${poNumber}_Lot_${cleanString(matrix.lotNumber || 'Unknown')}_${filenameDatePart(issueDate)}.pdf`
+        : `Lot_${cleanString(matrix.lotNumber || 'Unknown')}_Purchase_Order_${filenameDatePart(issueDate)}.pdf`;
     doc.save(fname);
 
     // Save order data to Google Sheets
@@ -1816,7 +1829,8 @@ export const generateIssuePdf = async (matrix, {
         message: saveResult.message,
         pendingData: pendingData,
         selectedPieces: selectedTotalPieces,
-        totalPieces: matrix.totals.grand
+        totalPieces: matrix.totals.grand,
+        totalZipCost: totalZipCost
     };
 };
 export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => { } } = {}) {
@@ -2009,41 +2023,17 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
             setLoading(false);
         }
     };
-    const initializeZipSelections = async (matrixData, signal) => {
+    const initializeZipSelections = async (matrixData, _signal) => {
         const initialSelections = {};
-        const blockedShades = new Set();
 
-        // Check for existing purchase orders
-        const existingOrders = await fetchExistingPurchaseOrders(matrixData.lotNumber, signal);
-
-        if (existingOrders) {
-            // Collect all blocked shades from existing orders
-            existingOrders.forEach(order => {
-                Object.entries(order).forEach(([color, selection]) => {
-                    // If selection is not empty, block this shade
-                    if (selection && selection.trim() !== '') {
-                        blockedShades.add(color);
-                    }
-                });
-            });
-        }
-
-        // Initialize selections, blocking shades that already have orders
+        // All shades are always available — every submission creates a NEW row (new SR NO).
+        // Previous orders for the same lot are never overwritten.
         matrixData.rows.forEach(row => {
-            const color = row.color;
-            if (blockedShades.has(color)) {
-                // This shade is blocked (already has an order)
-                initialSelections[color] = 'BLOCKED';
-            } else {
-                // This shade is available for new order
-                initialSelections[color] = '';
-            }
+            initialSelections[row.color] = '';
         });
 
         setZipSelections(initialSelections);
-
-        // Store blocked shades for UI display
-        setBlockedShades(blockedShades);
+        setBlockedShades(new Set()); // No shades are ever blocked
 
         // Initialize with default values
         setPlacementQuantities({ default: 1 });
@@ -2283,6 +2273,16 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
         try {
             addSupervisorToOptions(supervisor);
 
+            // Fetch unique ZIP PO number from backend
+            let poNumber = '';
+            try {
+                const poRes = await fetch(`${getBackendUrl()}/api/po-number/next/zip`);
+                const poData = await poRes.json();
+                poNumber = poData.poNumber || '';
+            } catch (e) {
+                console.warn('Could not fetch PO number:', e);
+            }
+
             // Generate PDF with selected shades data
             const result = await generateIssuePdf(matrix, {
                 issueDate,
@@ -2293,7 +2293,8 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
                 placementQuantities,
                 placementZipTypes,
                 zipQualityData,
-                blockedShades // Add blockedShades here
+                blockedShades,
+                poNumber
             });
 
             setShowIssueDialog(false);
@@ -2310,11 +2311,13 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
                         placementQuantities,
                         placementZipTypes,
                         zipQualityData,
+                        totalCost: result.totalZipCost || 0,
+                        poNumber,
                     };
                     await fetch(`${getBackendUrl()}/api/cutting-headers/${matrix.lotNumber}/payload`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ zip_payload: JSON.stringify(zipPayload) })
+                        body: JSON.stringify({ zip_payload: JSON.stringify(zipPayload), po_number: poNumber })
                     });
                 } catch (saveErr) {
                     console.error("Failed to save zip payload local:", saveErr);
@@ -4235,48 +4238,60 @@ export function ZipDashboard({ onCompileNewPO }) {
         setLoading(true);
         setError('');
         try {
-            const scansRes = await fetch(`${backendUrl}/api/scans`);
-            const localScans = scansRes.ok ? await scansRes.json() : [];
+            // Fetch directly from the zip table — only lots with real Zip PO data
+            const zipRes = await fetch(`${backendUrl}/api/zip-orders`);
+            if (!zipRes.ok) throw new Error('Failed to fetch Zip PO list from database');
+            const data = await zipRes.json();
 
-            const poRes = await fetch(`${backendUrl}/api/cutting-headers`);
-            if (!poRes.ok) throw new Error('Failed to fetch PO list from database');
-            const data = await poRes.json();
+            // Only show entries that have a PO number (newly created entries)
+            const newEntries = data.filter(row => row.po_number && String(row.po_number).trim() !== '');
 
-            const parsedPOs = data.map(row => {
+            const parsedPOs = newEntries.map(row => {
                 const lotNumber = String(row.Lot_Number || '').trim();
                 if (!lotNumber) return null;
 
-                const lotScans = Array.isArray(localScans) ? localScans.filter(s => String(s.lot_number).trim() === lotNumber) : [];
-                const localGateScan = lotScans.find(s => s.scan_type === 'gate_entry');
-                const localMatScan = lotScans.find(s => s.scan_type === 'material_in');
-                const localSupScan = lotScans.find(s => s.scan_type === 'supplier_entry');
-
-                const gatePerson = localGateScan?.person_name || '';
-                const gateDate = localGateScan?.scanned_at ? new Date(localGateScan.scanned_at).toLocaleDateString('en-GB') : '';
+                // Gate entry from zip table columns (updated by scanner)
+                const gatePerson = row.Gate_Entry_Person || '';
+                const gateDate = row.Gate_Entry_Date
+                    ? new Date(row.Gate_Entry_Date).toLocaleDateString('en-GB')
+                    : '';
                 const gateDone = !!gatePerson;
 
-                const matPerson = localMatScan?.person_name || '';
-                const matDate = localMatScan?.scanned_at ? new Date(localMatScan.scanned_at).toLocaleDateString('en-GB') : '';
+                const matPerson = row.Material_Received_By || '';
+                const matDate = row.Material_Received_Date
+                    ? new Date(row.Material_Received_Date).toLocaleDateString('en-GB')
+                    : '';
                 const matDone = !!matPerson;
 
-                const supPerson = localSupScan?.person_name || '';
-                const supDate = localSupScan?.scanned_at ? new Date(localSupScan.scanned_at).toLocaleDateString('en-GB') : '';
+                const supPerson = row.Supplier_Name || '';
+                const supDate = row.Material_Entry_Date
+                    ? new Date(row.Material_Entry_Date).toLocaleDateString('en-GB')
+                    : '';
                 const supDone = !!supPerson;
 
-                const placements = row.Sticker ? String(row.Sticker) : 'DEFAULT';
-                const issueDateStr = row.Date_of_Issue || row.JobOrder_Date || row.Saved_At || '';
+                // Parse placements from zip table
+                let placementsStr = 'DEFAULT';
+                try {
+                    const pl = JSON.parse(row.Selected_Placements || '[]');
+                    if (Array.isArray(pl) && pl.length > 0) placementsStr = pl.join(', ');
+                } catch (_) {}
+
+                const issueDateStr = row.Issue_Date || row.Saved_At || '';
                 const aging = calculateAging(issueDateStr, gateDate, matDate, supDate);
 
                 return {
+                    id: row.id,
+                    version: parseInt(row.version) || 1,
                     lotNumber,
-                    garmentType: row.Garment_Type || '',
-                    style: row.Style || '',
-                    fabric: row.Fabric || '',
-                    pieces: parseInt(row.Cutting_Qty || row.Stitching_Issue_Qty) || 0,
-                    cost: 0,
+                    garmentType: row.ch_garment || row.Garment_Type || '',
+                    style: row.ch_style || row.Style || '',
+                    fabric: row.ch_fabric || row.Fabric || '',
+                    pieces: parseInt(row.Total_Pieces_CH || row.Total_Pieces) || 0,
+                    cost: parseFloat(row.Total_Cost) || 0,
+                    poNumber: row.po_number || '',
                     issueDateStr,
                     supervisor: row.Supervisor || '',
-                    placements,
+                    placements: placementsStr,
                     gatePerson,
                     gateDate,
                     gateDone,
@@ -4296,11 +4311,12 @@ export function ZipDashboard({ onCompileNewPO }) {
             setPoList(parsedPOs);
         } catch (err) {
             console.error(err);
-            setError(err.message || 'Failed to load PO dashboard data');
+            setError(err.message || 'Failed to load Zip PO dashboard data');
         } finally {
             setLoading(false);
         }
     };
+
 
     useEffect(() => {
         fetchDashboardData();
@@ -4399,10 +4415,11 @@ export function ZipDashboard({ onCompileNewPO }) {
     };
 
     const downloadCSV = () => {
-        const csvHeaders = ['SR. NO.', 'LOT NO.', 'GARMENT TYPE', 'STYLE', 'PIECES', 'COST', 'ISSUE DATE', 'SUPERVISOR', 'ZIP PLACEMENTS', 'GATE ENTRY', 'MATERIAL RECEIVED', 'SUPPLIER', 'AGING'];
+        const csvHeaders = ['SR. NO.', 'LOT NO.', 'VERSION', 'GARMENT TYPE', 'STYLE', 'PIECES', 'COST', 'ISSUE DATE', 'SUPERVISOR', 'ZIP PLACEMENTS', 'GATE ENTRY', 'MATERIAL RECEIVED', 'SUPPLIER', 'AGING'];
         const csvRows = filteredPOs.map((po, index) => [
             index + 1,
             po.lotNumber,
+            `V${po.version}`,
             po.garmentType,
             po.style,
             po.pieces,
@@ -4442,6 +4459,7 @@ export function ZipDashboard({ onCompileNewPO }) {
         const tableData = filteredPOs.map((po, index) => [
             index + 1,
             po.lotNumber,
+            `V${po.version}`,
             po.garmentType,
             po.style,
             po.pieces,
@@ -4456,7 +4474,7 @@ export function ZipDashboard({ onCompileNewPO }) {
         ]);
 
         autoTable(doc, {
-            head: [['SR.', 'LOT', 'GARMENT', 'STYLE', 'QTY', 'COST', 'DATE', 'SUPERVISOR', 'PLACEMENTS', 'GATE', 'RECEIVE', 'SUPPLIER', 'AGING']],
+            head: [['SR.', 'LOT', 'VER.', 'GARMENT', 'STYLE', 'QTY', 'COST', 'DATE', 'SUPERVISOR', 'PLACEMENTS', 'GATE', 'RECEIVE', 'SUPPLIER', 'AGING']],
             body: tableData,
             startY: 25,
             theme: 'striped',
@@ -4750,7 +4768,8 @@ export function ZipDashboard({ onCompileNewPO }) {
                             <tr>
                                 <th style={{ width: '40px', textAlign: 'center' }}>Sr. No.</th>
                                 <th>Lot No.</th>
-                                <th>Run Version</th>
+                                <th style={{ width: '60px', textAlign: 'center' }}>Ver.</th>
+                                <th>PO No.</th>
                                 <th>Garment Type</th>
                                 <th>Style</th>
                                 <th>Pieces</th>
@@ -4774,15 +4793,34 @@ export function ZipDashboard({ onCompileNewPO }) {
                             ) : (
                                 paginatedPOs.map((po, index) => {
                                     const serialNo = (currentPage - 1) * rowsPerPage + index + 1;
-                                    const verInfo = getLotVersionInfo(po.lotNumber);
+                                    const isMultiVersion = poList.filter(p => p.lotNumber === po.lotNumber).length > 1;
                                     return (
-                                        <tr key={po.lotNumber}>
+                                        <tr key={po.id || `${po.lotNumber}-v${po.version}`}>
                                             <td style={{ textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)' }}>{serialNo}</td>
-                                            <td style={{ fontWeight: '700', color: 'var(--accent-color)' }}>{verInfo.displayLot}</td>
-                                            <td>
-                                                <span className={`status-badge ${verInfo.isRecreated ? 'in-verification' : 'approved'}`} style={{ fontSize: '11px', padding: '3px 8px', textTransform: 'none' }}>
-                                                    {verInfo.versionText}
+                                            <td style={{ fontWeight: '700', color: 'var(--accent-color)' }}>{po.lotNumber}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700',
+                                                    background: isMultiVersion
+                                                        ? (po.version === 1 ? 'rgba(99,102,241,0.1)' : 'rgba(16,185,129,0.1)')
+                                                        : 'rgba(100,116,139,0.1)',
+                                                    color: isMultiVersion
+                                                        ? (po.version === 1 ? '#6366f1' : '#10b981')
+                                                        : '#64748b',
+                                                    border: `1px solid ${isMultiVersion ? (po.version === 1 ? 'rgba(99,102,241,0.3)' : 'rgba(16,185,129,0.3)') : 'rgba(100,116,139,0.2)'}`
+                                                }}>
+                                                    V{po.version}
                                                 </span>
+                                            </td>
+                                            <td>
+                                                {po.poNumber
+                                                    ? <span className="status-badge approved" style={{ fontSize: '11px', padding: '3px 8px', textTransform: 'none', letterSpacing: '0.5px' }}>{po.poNumber}</span>
+                                                    : <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>—</span>
+                                                }
                                             </td>
                                             <td style={{ fontWeight: '600' }}>
                                                 {po.garmentType}

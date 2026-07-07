@@ -31,7 +31,7 @@ export const generateQRCode = async (url) => {
       continue;
     }
   }
-  
+
   throw new Error('All QR code services are currently unavailable');
 };
 
@@ -90,7 +90,7 @@ const RGP_TYPES = ["Fabric", "Tools", "Machine", "Sample", "Other"];
 // Prepared By & Authorized By Options
 const PREPARED_BY_OPTIONS = [
   "RASHMI",
-  
+
 ];
 
 const AUTHORIZED_BY_OPTIONS = [
@@ -98,7 +98,7 @@ const AUTHORIZED_BY_OPTIONS = [
   "EA",
   "VARUN SIR",
   "SAHIL CA",
-  
+
 ];
 
 // Enhanced RGP PDF Generator - With Prepared By & Authorized By
@@ -217,7 +217,7 @@ export function generateRgpPDF({ payload, options = {} }) {
     if (qrEntryImage) {
       const qx = x3 + 12 + (wGate - 24 - QR_SIDE) / 2;
       const qy = y + 18 + 10;
-      try { doc.addImage(qrEntryImage, "PNG", qx, qy, QR_SIDE, QR_SIDE); } catch {}
+      try { doc.addImage(qrEntryImage, "PNG", qx, qy, QR_SIDE, QR_SIDE); } catch { }
     }
 
     y += blockH + 16;
@@ -232,8 +232,8 @@ export function generateRgpPDF({ payload, options = {} }) {
       const qty1 = (+r.qty1 || 0).toLocaleString();
       const qty2 = (+r.qty2 || 0).toLocaleString();
       const totalQty = (+r.qty1 || 0);
-      return { 
-        ...r, 
+      return {
+        ...r,
         _i: i + 1,
         _qty1Str: qty1,
         _qty2Str: qty2,
@@ -243,9 +243,9 @@ export function generateRgpPDF({ payload, options = {} }) {
     });
 
     const measureMax = (arr, key) => arr.reduce((m, r) => Math.max(m, doc.getTextWidth(String(r[key] || ""))), 0);
-    
-    const MIN = { 
-      line: 28, lotNo: 50, department: 80, description: 120, 
+
+    const MIN = {
+      line: 28, lotNo: 50, department: 80, description: 120,
       purpose: 70, uom: 45, qty1: 40, qty2: 40, totalQty: 45
     };
 
@@ -296,7 +296,7 @@ export function generateRgpPDF({ payload, options = {} }) {
       doc.rect(x0, y, innerW, rowH);
       for (let i = 1; i < xs.length - 1; i++) line(xs[i], y, xs[i], y + rowH);
       const yy = y + 12;
-      
+
       rtext(r._i, xs[1] - 6, yy);
       text(r.lotNo || "", xs[1] + 6, yy);
       text(r.department || "", xs[2] + 6, yy);
@@ -311,9 +311,9 @@ export function generateRgpPDF({ payload, options = {} }) {
     };
 
     drawHeader();
-    let totalQuantity = 0; 
+    let totalQuantity = 0;
     rows.forEach((r, i) => { totalQuantity += drawRow(r, i); });
-    
+
     const totalH = 26;
     needSpace(totalH, true);
     doc.rect(x0, y, innerW, totalH);
@@ -341,7 +341,7 @@ export function generateRgpPDF({ payload, options = {} }) {
     if (qrReturnImage) {
       const qx = x1 + 10 + (colW - 20 - QR_SIDE) / 2;
       const qy = blockTop + 18 + 10;
-      try { doc.addImage(qrReturnImage, "PNG", qx, qy, QR_SIDE, QR_SIDE); } catch {}
+      try { doc.addImage(qrReturnImage, "PNG", qx, qy, QR_SIDE, QR_SIDE); } catch { }
     }
 
     // Wide right box: REMARKS
@@ -511,7 +511,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
   const [customUoms, setCustomUoms] = useState({});
   const [showPreview, setShowPreview] = useState(false);
   const [submissionComplete, setSubmissionComplete] = useState(false);
-  
+
   // New states for Prepared By & Authorized By
   const [isPreparedByCustom, setIsPreparedByCustom] = useState(false);
   const [isAuthorizedByCustom, setIsAuthorizedByCustom] = useState(false);
@@ -521,6 +521,10 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
   // Multi-mode configuration
   const [rgpMode, setRgpMode] = useState("automatic"); // "automatic" or "manual"
   const [wizardStep, setWizardStep] = useState(1); // 1 = Lot Search, 2 = Config & Matrix, 3 = Details & Review
+
+  const [zipHeaders, setZipHeaders] = useState([]);
+  const [doriOrders, setDoriOrders] = useState([]);
+  const [trimPOs, setTrimPOs] = useState([]);
 
   useEffect(() => {
     if (prefilledRgpData) {
@@ -564,17 +568,17 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     } catch (err) {
       console.warn("Failed to fetch scans for sequential RGP numbering:", err);
     }
-    
+
     const localLast = localStorage.getItem("gpdms_last_rgp_seq");
     let localSeq = localLast ? parseInt(localLast, 10) : 0;
     if (isNaN(localSeq) || localSeq >= 10000) {
       localSeq = 0;
     }
     const finalSeq = Math.max(maxSeq, localSeq) + 1;
-    
+
     const paddedSeq = String(finalSeq).padStart(6, "0");
     const nextNo = `RGP-${paddedSeq}`;
-    
+
     setForm((f) => ({ ...f, rgpNo: nextNo }));
   };
 
@@ -621,22 +625,32 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     setTrackerError("");
     setTrackerLogs([]);
     try {
-      const hostname = window.location.hostname;
-      const res = await fetch(`${getBackendUrl()}/api/scans`);
-      if (!res.ok) throw new Error("Failed to fetch scan logs from server.");
-      const data = await res.json();
+      const backendUrl = getBackendUrl();
+      const [scansRes, zipRes, doriRes, posRes] = await Promise.all([
+        fetch(`${backendUrl}/api/scans`),
+        fetch(`${backendUrl}/api/cutting-headers`),
+        fetch(`${backendUrl}/api/doori-orders`),
+        fetch(`${backendUrl}/api/pos`)
+      ]);
       
-      const filtered = data.filter(
-        (s) => 
-          (s.scan_type === 'rgp_entry' || s.scan_type === 'rgp_return' || 
-          (s.lot_number && s.lot_number.toUpperCase().includes('RGP')))
+      const scansData = scansRes.ok ? await scansRes.json() : [];
+      const zipsData = zipRes.ok ? await zipRes.json() : [];
+      const dorisData = doriRes.ok ? await doriRes.json() : [];
+      const posData = posRes.ok ? await posRes.json() : [];
+      
+      setZipHeaders(zipsData);
+      setDoriOrders(dorisData);
+      setTrimPOs(posData);
+      
+      const filtered = scansData.filter(
+        (s) => s.lot_number && s.lot_number.trim() !== ''
       );
       
       filtered.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
       
       setTrackerLogs(filtered);
       if (filtered.length === 0) {
-        setTrackerError("No RGP scan records found in the database.");
+        setTrackerError("No scan records found in the database.");
       }
     } catch (err) {
       console.error("Tracker fetch all error:", err);
@@ -656,12 +670,24 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     setTrackerError("");
     setTrackerLogs([]);
     try {
-      const hostname = window.location.hostname;
-      const res = await fetch(`${getBackendUrl()}/api/scans`);
-      if (!res.ok) throw new Error("Failed to fetch scan logs from server.");
-      const data = await res.json();
+      const backendUrl = getBackendUrl();
+      const [scansRes, zipRes, doriRes, posRes] = await Promise.all([
+        fetch(`${backendUrl}/api/scans`),
+        fetch(`${backendUrl}/api/cutting-headers`),
+        fetch(`${backendUrl}/api/doori-orders`),
+        fetch(`${backendUrl}/api/pos`)
+      ]);
       
-      const filtered = data.filter(
+      const scansData = scansRes.ok ? await scansRes.json() : [];
+      const zipsData = zipRes.ok ? await zipRes.json() : [];
+      const dorisData = doriRes.ok ? await doriRes.json() : [];
+      const posData = posRes.ok ? await posRes.json() : [];
+      
+      setZipHeaders(zipsData);
+      setDoriOrders(dorisData);
+      setTrimPOs(posData);
+      
+      const filtered = scansData.filter(
         (s) => (s.lot_number || "").trim().toLowerCase() === trimmed.toLowerCase()
       );
       
@@ -700,21 +726,21 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     setSearchedMatrix(null);
     setSelectedBomItem(null);
     setSelectedMatrixRows(new Set());
-    
+
     try {
       // 1. Fetch design/BOM requirements
       const designRes = await fetch(`${getBackendUrl()}/api/public/lot/${searchLotNo.trim()}`);
       let designData = null;
       if (designRes.ok) {
         designData = await designRes.json();
-        
+
         // Enforce design approval check
         if (designData.status !== 'Approved') {
           setSearchError(`Design lot #${searchLotNo.trim()} is currently "${designData.status || 'Pending'}". It must be approved before creating an RGP.`);
           setSearchLoading(false);
           return;
         }
-        
+
         setSearchedDesign(designData);
       } else {
         // Design not registered in system DB yet
@@ -722,7 +748,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
         setSearchLoading(false);
         return;
       }
-      
+
       // 2. Fetch cutting matrix
       const cuttingRes = await fetch(`${getBackendUrl()}/api/cutting/${searchLotNo.trim()}`);
       if (cuttingRes.ok) {
@@ -738,7 +764,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       } else {
         setUseMatrix(false);
       }
-      
+
       if (designData) {
         setWizardStep(2);
         if (designData.bom && Array.isArray(designData.bom)) {
@@ -761,14 +787,14 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
   function handleSelectBomItem(item) {
     setSelectedBomItem(item);
     update("rgpType", item.name);
-    
+
     const detailNum = parseFloat(item.detail);
     if (!isNaN(detailNum) && detailNum > 0) {
       setQtyPerPiece(String(detailNum));
     } else {
       setQtyPerPiece("1");
     }
-    
+
     // Map UOM
     if (item.name.toLowerCase().includes("zip")) {
       setItemUom("PCS");
@@ -783,15 +809,15 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
   const handleAddMatrixRowsToRgp = () => {
     if (!searchedDesign || !selectedBomItem) return;
-    
+
     const qtyMultiplier = parseFloat(qtyPerPiece) || 0;
     if (useMatrix && qtyMultiplier <= 0) {
       alert("Please enter a valid Quantity per piece (> 0).");
       return;
     }
-    
+
     const rowsToAdd = [];
-    
+
     if (useMatrix && searchedMatrix && searchedMatrix.rows && searchedMatrix.rows.length > 0) {
       searchedMatrix.rows.forEach(row => {
         if (selectedMatrixRows.has(row.color)) {
@@ -825,12 +851,12 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
         purpose: form.purpose || "Stitching"
       });
     }
-    
+
     if (rowsToAdd.length === 0) {
       alert("No items were generated. Make sure you selected at least one color row with pieces.");
       return;
     }
-    
+
     setForm(f => {
       let currentEntries = [...(f.entries || [])];
       if (currentEntries.length === 1 && !currentEntries[0].lotNo && !currentEntries[0].itemDesc) {
@@ -841,7 +867,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
         entries: [...currentEntries, ...rowsToAdd]
       };
     });
-    
+
     setSelectedBomItem(null);
     setFlatQuantity("");
     setFlatDescription("");
@@ -870,7 +896,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       alert("Please enter a Purpose.");
       return;
     }
-    
+
     const newEntry = {
       lotNo: customItemLot.trim() || "N/A",
       itemDesc: customItemDesc.trim(),
@@ -880,7 +906,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       department: customItemDept,
       purpose: customItemPurpose.trim()
     };
-    
+
     setForm(f => {
       let currentEntries = [...(f.entries || [])];
       if (currentEntries.length === 1 && !currentEntries[0].lotNo && !currentEntries[0].itemDesc) {
@@ -891,7 +917,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
         entries: [...currentEntries, newEntry]
       };
     });
-    
+
     setCustomItemDesc("");
     setCustomItemQty("");
     setCustomItemBags("0");
@@ -994,12 +1020,12 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
   const handleFinalSubmit = async () => {
     if (submitting) return;
-    
+
     const first = (form.entries || [])[0] || {};
     const legacyQty = (Number(first.qty1) || 0) || "";
     const activeRgpType = rgpMode === "automatic" && selectedBomItem ? selectedBomItem.name : form.rgpType;
     const rgpTypeFinal = activeRgpType === "Other" ? customRgpType.trim() : activeRgpType;
-    
+
     // Get final Prepared By and Authorized By values
     const finalPreparedBy = isPreparedByCustom ? preparedByCustomValue : form.preparedBy;
     const finalAuthorizedBy = isAuthorizedByCustom ? authorizedByCustomValue : form.authorizedBy;
@@ -1062,9 +1088,9 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     // Bypassing Google Sheets if WEB_APP_URL is empty
     if (!WEB_APP_URL || !WEB_APP_URL.includes("/exec")) {
       console.log("WEB_APP_URL is empty or invalid. Generating local RGP print and completing.");
-      
+
       const localRgpNo = form.rgpNo && form.rgpNo !== "(auto)" ? form.rgpNo : "RGP-" + String(new Date().getTime()).slice(-6);
-      
+
       if (localRgpNo.startsWith("RGP-")) {
         const parts = localRgpNo.split("-");
         const seq = parseInt(parts[parts.length - 1], 10);
@@ -1072,18 +1098,18 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
           localStorage.setItem("gpdms_last_rgp_seq", String(seq));
         }
       }
-      
+
       const payloadWithNo = { ...payload, rgpNo: localRgpNo };
-      
+
       // Save RGP number to scans database to sync next RGP sequence
       await saveRgpToScans(localRgpNo);
-      
+
       let localSystemUrl = `${window.location.origin}/`;
-      const isLocalHostOrIP = 
-        window.location.hostname === 'localhost' || 
-        window.location.hostname === '127.0.0.1' || 
-        window.location.hostname.startsWith('192.168.') || 
-        window.location.hostname.startsWith('10.') || 
+      const isLocalHostOrIP =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('10.') ||
         window.location.hostname.startsWith('172.');
 
       if (isLocalHostOrIP) {
@@ -1102,10 +1128,10 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
         const port = window.location.port ? `:${window.location.port}` : '';
         localSystemUrl = `http://${serverIp}${port}/`;
       }
-      
+
       const entryUrl = `${localSystemUrl}?action=rgpEntryForm&rgp=${encodeURIComponent(localRgpNo)}`;
       const returnUrl = `${localSystemUrl}?action=rgpReturnForm&rgp=${encodeURIComponent(localRgpNo)}`;
-      
+
       let entryQR, returnQR;
       try { entryQR = await generateQRCode(entryUrl); } catch (qrError) { console.error("Failed to generate entry QR:", qrError); }
       try { returnQR = await generateQRCode(returnUrl); } catch (qrError) { console.error("Failed to generate return QR:", qrError); }
@@ -1116,43 +1142,43 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
       setForm((f) => ({ ...f, rgpNo: localRgpNo }));
       if (onSubmit) onSubmit(payloadWithNo);
-      
+
       const pdfDoc = generateRgpPDF({ payload: payloadWithNo, options: { qrEntryImage: entryQRDataUrl, qrReturnImage: returnQRDataUrl } });
       pdfDoc.save(`RGP-${localRgpNo}.pdf`);
-      
+
       setShowPreview(false);
       alert(`✅ RGP PDF Generated Locally!\nPDF has been downloaded.`);
       setSubmitting(false);
       silentRefresh();
       return;
     }
-    
+
     try {
       console.log("Submitting payload to:", WEB_APP_URL);
-      
+
       const res = await fetch(WEB_APP_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "Accept": "application/json" },
         body: "data=" + encodeURIComponent(JSON.stringify(payload)),
       });
-      
+
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      
+
       const text = await res.text();
       let json;
       try { json = JSON.parse(text); } catch (parseError) { throw new Error('Invalid response from server'); }
-      
+
       if (!json.ok) throw new Error(json.error || "Save failed");
 
       const assignedRgpNo = json.rgpNo;
       console.log("RGP created successfully:", assignedRgpNo);
 
       let localSystemUrl = `${window.location.origin}/`;
-      const isLocalHostOrIP = 
-        window.location.hostname === 'localhost' || 
-        window.location.hostname === '127.0.0.1' || 
-        window.location.hostname.startsWith('192.168.') || 
-        window.location.hostname.startsWith('10.') || 
+      const isLocalHostOrIP =
+        window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname.startsWith('192.168.') ||
+        window.location.hostname.startsWith('10.') ||
         window.location.hostname.startsWith('172.');
 
       if (isLocalHostOrIP) {
@@ -1171,7 +1197,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
         const port = window.location.port ? `:${window.location.port}` : '';
         localSystemUrl = `http://${serverIp}${port}/`;
       }
-      
+
       const entryUrl = `${localSystemUrl}?action=rgpEntryForm&rgp=${encodeURIComponent(assignedRgpNo)}`;
       const returnUrl = `${localSystemUrl}?action=rgpReturnForm&rgp=${encodeURIComponent(assignedRgpNo)}`;
 
@@ -1185,18 +1211,18 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
       setForm((f) => ({ ...f, rgpNo: assignedRgpNo }));
       if (onSubmit) onSubmit({ ...payload, rgpNo: assignedRgpNo });
-      
+
       // Save RGP number to scans database to sync next RGP sequence
       await saveRgpToScans(assignedRgpNo);
-      
+
       const pdfDoc = generateRgpPDF({ payload: { ...payload, rgpNo: assignedRgpNo }, options: { qrEntryImage: entryQRDataUrl, qrReturnImage: returnQRDataUrl } });
       const safeNo = assignedRgpNo.replace(/[^\w\-]+/g, "-");
       pdfDoc.save(`RGP-${safeNo}.pdf`);
-      
+
       setShowPreview(false);
       alert(`✅ RGP Created Successfully!\nRGP No: ${assignedRgpNo}\nPDF has been downloaded.`);
       silentRefresh();
-      
+
     } catch (err) {
       console.error("Submit error:", err);
       alert(`❌ Error: ${err.message}\n\nData was saved to sheet but PDF generation failed.`);
@@ -1230,7 +1256,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
     setIsAuthorizedByCustom(false);
     setPreparedByCustomValue("");
     setAuthorizedByCustomValue("");
-    
+
     // Reset wizard states
     setWizardStep(1);
     setSearchLotNo("");
@@ -1858,7 +1884,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       { num: 2, label: "Select BOM & Matrix" },
       { num: 3, label: "Fill Details & Review" }
     ];
-    
+
     return (
       <div style={styles.wizardIndicatorContainer}>
         {steps.map((s, idx) => (
@@ -1919,9 +1945,9 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
           allScans: []
         };
       }
-      
+
       rgpGroups[rgpNo].allScans.push(log);
-      
+
       if (log.scan_type === 'gate_entry') {
         rgpGroups[rgpNo].gateEntry = log;
       } else if (log.scan_type === 'material_in') {
@@ -1959,7 +1985,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
               ×
             </button>
           </div>
-          
+
           <div style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(90vh - 120px)' }}>
             {/* Search bar */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
@@ -2065,14 +2091,61 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                   <tbody>
                     {rgpRows.map((row, idx) => {
                       const agingDays = Math.max(0, Math.floor((new Date() - new Date(row.firstScanDate)) / (1000 * 60 * 60 * 24)));
+                      const isRgp = String(row.rgpNo).toUpperCase().includes('RGP');
+                      
+                      let associatedLots = [];
+                      if (isRgp && row.rgpEntry && row.rgpEntry.rgp_payload) {
+                        try {
+                          const payload = JSON.parse(row.rgpEntry.rgp_payload);
+                          if (payload && Array.isArray(payload.entries)) {
+                            associatedLots = payload.entries.map(e => String(e.lotNo).toLowerCase().trim());
+                          }
+                        } catch(e){}
+                      }
+
+                      const cleanRgpNo = String(row.rgpNo).toLowerCase().trim();
+                      const hasZipPo = zipHeaders.some(h => String(h.Lot_Number).toLowerCase().trim() === cleanRgpNo) || associatedLots.some(lot => zipHeaders.some(h => String(h.Lot_Number).toLowerCase().trim() === lot));
+                      const hasDoriPo = doriOrders.some(h => String(h.Lot_Number).toLowerCase().trim() === cleanRgpNo) || associatedLots.some(lot => doriOrders.some(h => String(h.Lot_Number).toLowerCase().trim() === lot));
+                      const hasTrimPo = trimPOs.some(po => 
+                        (po.designName && String(po.designName).toLowerCase().trim() === cleanRgpNo) ||
+                        (po.poNumber && String(po.poNumber).toLowerCase().trim() === cleanRgpNo)
+                      ) || associatedLots.some(lot => trimPOs.some(po => 
+                        (po.designName && String(po.designName).toLowerCase().trim() === lot) ||
+                        (po.poNumber && String(po.poNumber).toLowerCase().trim() === lot)
+                      ));
+
                       return (
                         <tr key={row.rgpNo} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                           <td style={{ padding: '16px 8px', textAlign: 'center', fontWeight: '600', color: '#94a3b8' }}>{idx + 1}</td>
-                          <td style={{ padding: '16px 8px', fontWeight: '700', color: '#38bdf8' }}>{row.rgpNo}</td>
+                          <td style={{ padding: '16px 8px' }}>
+                            <div style={{ fontWeight: '700', color: '#38bdf8', fontSize: '13px' }}>{row.rgpNo}</div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                              {isRgp && (
+                                <span style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
+                                  RGP
+                                </span>
+                              )}
+                              {hasZipPo && (
+                                <span style={{ backgroundColor: 'rgba(236, 72, 153, 0.15)', color: '#f472b6', border: '1px solid rgba(236, 72, 153, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
+                                  ZIP PO
+                                </span>
+                              )}
+                              {hasDoriPo && (
+                                <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
+                                  DORI PO
+                                </span>
+                              )}
+                              {hasTrimPo && (
+                                <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
+                                  TRIM PO
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td style={{ padding: '16px 8px', fontWeight: '600' }}>{row.materialName}</td>
                           <td style={{ padding: '16px 8px', textAlign: 'center', fontWeight: '700' }}>{row.quantity}</td>
                           <td style={{ padding: '16px 8px' }}>{row.supplierName || '—'}</td>
-                          
+
                           {/* Gate Entry Status */}
                           <td style={{ padding: '16px 8px', textAlign: 'center' }}>
                             {row.gateEntry ? (
@@ -2089,7 +2162,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                               </span>
                             )}
                           </td>
-                          
+
                           {/* Material Received Status */}
                           <td style={{ padding: '16px 8px', textAlign: 'center' }}>
                             {row.materialIn ? (
@@ -2106,7 +2179,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                               </span>
                             )}
                           </td>
-                          
+
                           {/* RGP Issue Status */}
                           <td style={{ padding: '16px 8px', textAlign: 'center' }}>
                             {row.rgpEntry ? (
@@ -2123,7 +2196,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                               </span>
                             )}
                           </td>
-                          
+
                           {/* RGP Return Status */}
                           <td style={{ padding: '16px 8px', textAlign: 'center' }}>
                             {row.rgpReturn ? (
@@ -2140,7 +2213,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                               </span>
                             )}
                           </td>
-                          
+
                           {/* Aging Days */}
                           <td style={{ padding: '16px 8px', textAlign: 'center' }}>
                             <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', display: 'inline-block' }}>
@@ -2254,7 +2327,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
             <div style={styles.leftColumn}>
               {renderLeftColumnDetails()}
             </div>
-            
+
             {/* Right Column - Items */}
             <div style={styles.rightColumn}>
               {renderCustomItemCard()}
@@ -2265,14 +2338,14 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
           /* AUTOMATIC RGP MODE: Multi-step Wizard */
           <div>
             {renderWizardStepsIndicator()}
-            
+
             {/* Step 1: Center-aligned lot search */}
             {wizardStep === 1 && (
               <div style={styles.wizardCenteredStepContainer}>
                 {renderLotSearchStepCard()}
               </div>
             )}
-            
+
             {/* Step 2: Configure Matrix & Accessories */}
             {wizardStep === 2 && (
               <div style={styles.formBody}>
@@ -2292,7 +2365,7 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                 </div>
               </div>
             )}
-            
+
             {/* Step 3: Issue details & review */}
             {wizardStep === 3 && (
               <div style={styles.formBody}>

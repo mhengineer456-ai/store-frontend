@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import { TrendingUp, FileText, Calendar, DollarSign, Download, Printer, ClipboardList } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { getBackendUrl } from '../utils/api';
+import { 
+  TrendingUp, FileText, Calendar, DollarSign, Download, Printer, ClipboardList, 
+  Search, Scale, ArrowLeftRight, Settings, Users, ShieldAlert, Truck, Layers
+} from 'lucide-react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import { PDFDocument } from './PDFDocument';
 
@@ -10,13 +14,503 @@ export default function ReportsHistoryView({
   currencySymbol = 'R' 
 }) {
   const [selectedPo, setSelectedPo] = useState(null);
-  const [activeReportTab, setActiveReportTab] = useState('procurement'); // 'procurement' or 'material_ledger'
+  
+  // Premium Design Tokens
+  const styles = {
+    headerRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottom: '1px solid var(--border-color)',
+      paddingBottom: '12px',
+      marginBottom: '16px'
+    },
+    title: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '16px',
+      fontWeight: '800',
+      color: 'var(--text-main)',
+      margin: 0
+    },
+    filterBar: {
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      padding: '12px 16px',
+      backgroundColor: 'var(--bg-primary, #f8fafc)',
+      borderRadius: '8px',
+      border: '1px solid var(--border-color)',
+      marginBottom: '16px'
+    },
+    inputWrapper: {
+      position: 'relative',
+      flex: '1 1 200px',
+      minWidth: '150px'
+    },
+    inputIcon: {
+      position: 'absolute',
+      left: '12px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      color: 'var(--text-muted)',
+      display: 'flex',
+      alignItems: 'center'
+    },
+    input: {
+      paddingLeft: '34px',
+      height: '36px',
+      fontSize: '13px',
+      borderRadius: '8px',
+      border: '1px solid var(--border-color)',
+      background: 'var(--bg-secondary, #ffffff)',
+      color: 'var(--text-main)',
+      width: '100%',
+      outline: 'none',
+      transition: 'border-color 0.2s'
+    },
+    select: {
+      height: '36px',
+      fontSize: '13px',
+      padding: '0 28px 0 12px',
+      borderRadius: '8px',
+      border: '1px solid var(--border-color)',
+      background: 'var(--bg-secondary, #ffffff)',
+      color: 'var(--text-main)',
+      cursor: 'pointer',
+      outline: 'none',
+      minWidth: '130px',
+      appearance: 'none',
+      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'right 10px center',
+      transition: 'border-color 0.2s'
+    },
+    btn: {
+      height: '36px',
+      padding: '0 16px',
+      fontSize: '13px',
+      fontWeight: '600',
+      borderRadius: '8px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '6px',
+      cursor: 'pointer',
+      transition: 'all 0.2s'
+    }
+  };
+  const [activeReportTab, setActiveReportTab] = useState('material_ledger'); // 'material_ledger', 'designer_audits', 'store_audits'
   const [selectedLotId, setSelectedLotId] = useState('');
+  
+  // Audit states
+  const [designHistory, setDesignHistory] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [weightCaptures, setWeightCaptures] = useState([]);
+  const [zipOrders, setZipOrders] = useState([]);
+  const [dooriOrders, setDooriOrders] = useState([]);
+  const [scans, setScans] = useState([]);
+  const [expandedLotId, setExpandedLotId] = useState(null);
+  const [expandedStoreLogId, setExpandedStoreLogId] = useState(null);
+  const [expandedPtId, setExpandedPtId] = useState(null);
+  
+  // Search & Filter states
+  const [dhSearchQuery, setDhSearchQuery] = useState('');
+  const [dhActionFilter, setDhActionFilter] = useState('all');
+  const [dhDateFilter, setDhDateFilter] = useState('all');
+  const [dhSort, setDhSort] = useState('latest');
+  
+  const [saSearchQuery, setSaSearchQuery] = useState('');
+  const [saTypeFilter, setSaTypeFilter] = useState('all');
+  const [saDateFilter, setSaDateFilter] = useState('all');
+  const [saSort, setSaSort] = useState('latest');
+
+  // PO Sourcing Tracking states
+  const [ptSearchQuery, setPtSearchQuery] = useState('');
+  const [ptTypeFilter, setPtTypeFilter] = useState('all');
+  const [ptStatusFilter, setPtStatusFilter] = useState('all');
+  const [ptDateFilter, setPtDateFilter] = useState('all');
+  const [ptSort, setPtSort] = useState('latest');
+
+  // Load audit data based on tab selection
+  useEffect(() => {
+    if (activeReportTab === 'designer_audits' || activeReportTab === 'po_tracking') {
+      fetch(`${getBackendUrl()}/api/design-history`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setDesignHistory(data))
+        .catch(err => console.error('Error fetching design history:', err));
+
+      fetch(`${getBackendUrl()}/api/zip-orders`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setZipOrders(data))
+        .catch(err => console.error('Error fetching zip orders:', err));
+
+      fetch(`${getBackendUrl()}/api/doori-orders`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setDooriOrders(data))
+        .catch(err => console.error('Error fetching doori orders:', err));
+
+      fetch(`${getBackendUrl()}/api/scans`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setScans(data))
+        .catch(err => console.error('Error fetching scans:', err));
+    } else if (activeReportTab === 'store_audits') {
+      // Fetch transfers
+      fetch(`${getBackendUrl()}/api/transfers`)
+        .then(res => res.ok ? res.json() : [])
+        .then(data => setTransfers(data))
+        .catch(err => console.error('Error fetching transfers:', err));
+      
+      // Fetch weight captures
+      fetch(`${getBackendUrl()}/api/weight-capture`)
+        .then(res => res.ok ? res.json() : { success: false, data: [] })
+        .then(data => {
+          if (data.success && Array.isArray(data.data)) {
+            setWeightCaptures(data.data);
+          }
+        })
+        .catch(err => console.error('Error fetching weight captures:', err));
+    }
+  }, [activeReportTab]);
 
   // Calculate stats
   const totalPOValue = pos.reduce((sum, po) => sum + po.total, 0);
   const totalTaxPaid = pos.reduce((sum, po) => sum + po.tax, 0);
   const activePOUnits = pos.length;
+
+  // Store audits parser
+  const getStoreAudits = () => {
+    const list = [];
+    
+    // 1. Issue Logs
+    (issueLogs || []).forEach(log => {
+      list.push({
+        id: `IS-${log.id}`,
+        type: 'Material Issue',
+        date: log.issuedAt,
+        details: `${log.qtyIssued} units of material issued for Lot #${log.lotId}`,
+        operator: log.issuedBy || 'Store Incharge',
+        tag: 'issue'
+      });
+      if (log.returnedQty > 0) {
+        list.push({
+          id: `RT-${log.id}`,
+          type: 'Material Return',
+          date: log.returnedAt || log.issuedAt,
+          details: `${log.returnedQty} units of material returned for Lot #${log.lotId}`,
+          operator: log.returnedBy || 'Store Incharge',
+          tag: 'return'
+        });
+      }
+    });
+
+    // 2. Transfers
+    (transfers || []).forEach(t => {
+      list.push({
+        id: `TR-${t.id}`,
+        type: 'Stock Transfer',
+        date: t.transferredAt,
+        details: `${t.qty} units of ${t.materialName || 'trims'} transferred from ${t.fromLocation || 'Store'} to ${t.toLocation}`,
+        operator: t.transferredBy || 'System',
+        tag: 'transfer'
+      });
+    });
+
+    // 3. Weight Captures
+    (weightCaptures || []).forEach(wc => {
+      list.push({
+        id: `WC-${wc.id}`,
+        type: 'Weight Capture',
+        date: wc.capturedAt,
+        details: `Weighed ${wc.pieces || 0} pieces of ${wc.materialName || 'material'} (Net: ${wc.netWeightKg || 0} kg) for Lot #${wc.lotNo || '—'}`,
+        operator: wc.storeIncharge || 'Weighbridge Operator',
+        tag: 'weight'
+      });
+    });
+
+    // Sort by date descending
+    return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+  };
+
+  const applyDateFilter = (dateStr, filter) => {
+    if (filter === 'all') return true;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return true;
+    const now = new Date();
+    if (filter === 'today') return d.toDateString() === now.toDateString();
+    if (filter === 'week') {
+      const weekAgo = new Date(); weekAgo.setDate(now.getDate() - 7);
+      return d >= weekAgo;
+    }
+    if (filter === 'month') {
+      const monthAgo = new Date(); monthAgo.setDate(now.getDate() - 30);
+      return d >= monthAgo;
+    }
+    return true;
+  };
+
+  const sortByDate = (arr, dateField, order) => {
+    return [...arr].sort((a, b) => {
+      const da = new Date(a[dateField] || 0);
+      const db = new Date(b[dateField] || 0);
+      return order === 'latest' ? db - da : da - db;
+    });
+  };
+
+  const getStoreLogDetails = (idStr) => {
+    if (!idStr) return null;
+    const [prefix, rawId] = idStr.split('-');
+    const parsedId = Number(rawId);
+    
+    if (prefix === 'IS' || prefix === 'RT') {
+      const log = (issueLogs || []).find(l => Number(l.id) === parsedId);
+      return log ? { type: prefix, data: log } : null;
+    }
+    if (prefix === 'TR') {
+      const t = (transfers || []).find(x => Number(x.id) === parsedId);
+      return t ? { type: 'TR', data: t } : null;
+    }
+    if (prefix === 'WC') {
+      const wc = (weightCaptures || []).find(w => Number(w.id) === parsedId);
+      return wc ? { type: 'WC', data: wc } : null;
+    }
+    return null;
+  };
+
+  // Filtered Designer Audits
+  const filteredDesignerAudits = sortByDate(
+    (designHistory || []).filter(h => {
+      const query = dhSearchQuery.toLowerCase().trim();
+      const matchesSearch = !query || (
+        String(h.lotId).toLowerCase().includes(query) ||
+        (h.details || '').toLowerCase().includes(query) ||
+        (h.actorName || '').toLowerCase().includes(query) ||
+        (h.action || '').toLowerCase().includes(query)
+      );
+      const matchesAction = dhActionFilter === 'all' || (h.action || '').toLowerCase() === dhActionFilter.toLowerCase();
+      const matchesDate = applyDateFilter(h.timestamp, dhDateFilter);
+      return matchesSearch && matchesAction && matchesDate;
+    }),
+    'timestamp',
+    dhSort
+  );
+
+  const getLotAuditDetails = (lotId) => {
+    const lotStr = String(lotId).toLowerCase().trim();
+    
+    // 1. Find standard POs
+    const relatedPos = (pos || []).filter(po => 
+      String(po.lotId).toLowerCase().trim() === lotStr || 
+      (po.designName && String(po.designName).toLowerCase().includes(lotStr))
+    );
+
+    // 2. Find RGP scans
+    const relatedRgps = (scans || []).filter(s => 
+      String(s.lot_number).toLowerCase().trim() === lotStr && 
+      String(s.scan_type).toLowerCase() === 'rgp'
+    );
+
+    // 3. Find Zip POs
+    const relatedZips = (zipOrders || []).filter(z => 
+      String(z.Lot_Number).toLowerCase().trim() === lotStr
+    );
+
+    // 4. Find Doori POs
+    const relatedDooris = (dooriOrders || []).filter(d => 
+      String(d.Lot_Number).toLowerCase().trim() === lotStr
+    );
+
+    return {
+      pos: relatedPos,
+      rgps: relatedRgps,
+      zips: relatedZips,
+      dooris: relatedDooris
+    };
+  };
+
+  // Filtered Store Audits
+  const filteredStoreAudits = sortByDate(
+    getStoreAudits().filter(s => {
+      const query = saSearchQuery.toLowerCase().trim();
+      const matchesSearch = !query || (
+        s.id.toLowerCase().includes(query) ||
+        s.type.toLowerCase().includes(query) ||
+        s.details.toLowerCase().includes(query) ||
+        s.operator.toLowerCase().includes(query)
+      );
+      const matchesType = saTypeFilter === 'all' || s.tag === saTypeFilter;
+      const matchesDate = applyDateFilter(s.date, saDateFilter);
+      return matchesSearch && matchesType && matchesDate;
+    }),
+    'date',
+    saSort
+  );
+
+  const getPoTrackingList = () => {
+    const list = [];
+
+    // Helper: calculate received qty from scans
+    const getReceivedQty = (lotNo) => {
+      const lotStr = String(lotNo).toLowerCase().trim();
+      return scans
+        .filter(s => String(s.lot_number).toLowerCase().trim() === lotStr && s.scan_type === 'material_in')
+        .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+    };
+
+    // Helper: find scan details by type
+    const findScan = (lotNo, type) => {
+      const lotStr = String(lotNo).toLowerCase().trim();
+      return scans.find(s => String(s.lot_number).toLowerCase().trim() === lotStr && s.scan_type === type);
+    };
+
+    // 1. Normal POs
+    (pos || []).forEach(po => {
+      const reqQty = po.items ? po.items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0) : 0;
+      const recQty = getReceivedQty(po.lotId || po.poNumber);
+      
+      const gateScan = findScan(po.lotId || po.poNumber, 'gate_entry');
+      const recScan = findScan(po.lotId || po.poNumber, 'material_in');
+
+      list.push({
+        id: po.poNumber,
+        lotId: po.lotId || 'Manual',
+        type: 'Normal PO',
+        tag: 'normal',
+        supplier: po.vendorName || '—',
+        requestedQty: reqQty,
+        receivedQty: recQty,
+        gatePerson: gateScan ? gateScan.person_name : (po.gatePerson || '—'),
+        gateDate: gateScan ? new Date(gateScan.scanned_at).toLocaleDateString() : (po.gateDate || '—'),
+        receiver: recScan ? recScan.person_name : (po.receivedBy || '—'),
+        receivedDate: recScan ? new Date(recScan.scanned_at).toLocaleDateString() : (po.receivedDate || '—')
+      });
+    });
+
+    // 2. Zip POs
+    (zipOrders || []).forEach(z => {
+      const reqQty = Number(z.Total_Pieces) || 0;
+      const recQty = getReceivedQty(z.Lot_Number);
+
+      const gateScan = findScan(z.Lot_Number, 'gate_entry');
+      const recScan = findScan(z.Lot_Number, 'material_in');
+
+      list.push({
+        id: `ZIP-${z.Lot_Number}`,
+        lotId: z.Lot_Number,
+        type: 'Zip PO',
+        tag: 'zip',
+        supplier: z.Supplier_Name || '—',
+        requestedQty: reqQty,
+        receivedQty: recQty,
+        gatePerson: gateScan ? gateScan.person_name : (z.Gate_Entry_Person || '—'),
+        gateDate: gateScan ? new Date(gateScan.scanned_at).toLocaleDateString() : (z.Gate_Entry_Date || '—'),
+        receiver: recScan ? recScan.person_name : (z.Material_Received_By || '—'),
+        receivedDate: recScan ? new Date(recScan.scanned_at).toLocaleDateString() : (z.Material_Received_Date || '—')
+      });
+    });
+
+    // 3. Doori POs
+    (dooriOrders || []).forEach(d => {
+      const reqQty = Number(d.Total_Pieces) || 0;
+      const recQty = getReceivedQty(d.Lot_Number);
+
+      const gateScan = findScan(d.Lot_Number, 'gate_entry');
+      const recScan = findScan(d.Lot_Number, 'material_in');
+
+      list.push({
+        id: `DORI-${d.Lot_Number}`,
+        lotId: d.Lot_Number,
+        type: 'Doori PO',
+        tag: 'doori',
+        supplier: d.Supplier_Name || '—',
+        requestedQty: reqQty,
+        receivedQty: recQty,
+        gatePerson: gateScan ? gateScan.person_name : (d.Gate_Entry_Person || '—'),
+        gateDate: gateScan ? new Date(gateScan.scanned_at).toLocaleDateString() : (d.Gate_Entry_Date || '—'),
+        receiver: recScan ? recScan.person_name : (d.Material_Received_By || '—'),
+        receivedDate: recScan ? new Date(recScan.scanned_at).toLocaleDateString() : (d.Material_Received_Date || '—')
+      });
+    });
+
+    // 4. RGP POs (from scans where scan_type = 'rgp_entry')
+    const rgpScans = (scans || []).filter(s => s.scan_type === 'rgp_entry');
+    const rgpGroup = {};
+    rgpScans.forEach(s => {
+      const key = s.lot_number;
+      if (!rgpGroup[key]) {
+        rgpGroup[key] = {
+          qty: 0,
+          supplier: s.supplier_name,
+          person: s.person_name,
+          date: s.scanned_at
+        };
+      }
+      rgpGroup[key].qty += (Number(s.quantity) || 0);
+    });
+
+    Object.keys(rgpGroup).forEach(lotNo => {
+      const group = rgpGroup[lotNo];
+      const recQty = scans
+        .filter(s => String(s.lot_number).toLowerCase().trim() === lotNo.toLowerCase().trim() && s.scan_type === 'rgp_return')
+        .reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+
+      const returnScan = findScan(lotNo, 'rgp_return');
+
+      list.push({
+        id: `RGP-${lotNo}`,
+        lotId: lotNo,
+        type: 'RGP PO',
+        tag: 'rgp',
+        supplier: group.supplier || '—',
+        requestedQty: group.qty, // Sent out
+        receivedQty: recQty, // Returned back
+        gatePerson: group.person || '—', // Dispatcher
+        gateDate: new Date(group.date).toLocaleDateString(), // Dispatch date
+        receiver: returnScan ? returnScan.person_name : '—', // Receiver back
+        receivedDate: returnScan ? new Date(returnScan.scanned_at).toLocaleDateString() : '—' // Receive back date
+      });
+    });
+
+    return list;
+  };
+
+  // Filtered Sourcing & PO Tracking
+  const filteredPtList = sortByDate(
+    getPoTrackingList().filter(item => {
+      // 1. Search Query
+      const query = ptSearchQuery.toLowerCase().trim();
+      const matchesSearch = !query || (
+        String(item.id).toLowerCase().includes(query) ||
+        String(item.lotId).toLowerCase().includes(query) ||
+        (item.supplier || '').toLowerCase().includes(query) ||
+        (item.gatePerson || '').toLowerCase().includes(query) ||
+        (item.receiver || '').toLowerCase().includes(query)
+      );
+
+      // 2. Type Filter
+      const matchesType = ptTypeFilter === 'all' || item.tag === ptTypeFilter;
+
+      // 3. Status Filter
+      const status = item.receivedQty >= item.requestedQty && item.requestedQty > 0
+        ? 'fully'
+        : item.receivedQty > 0 && item.receivedQty < item.requestedQty
+        ? 'partially'
+        : (item.gatePerson && item.gatePerson !== '—')
+        ? 'gate_entered'
+        : 'pending';
+
+      const matchesStatus = ptStatusFilter === 'all' || status === ptStatusFilter;
+
+      // 4. Date Filter
+      const dateToCheck = item.receivedDate !== '—' ? item.receivedDate : item.gateDate;
+      const matchesDate = ptDateFilter === 'all' || applyDateFilter(dateToCheck, ptDateFilter);
+
+      return matchesSearch && matchesType && matchesStatus && matchesDate;
+    }),
+    'receivedDate',
+    ptSort
+  );
 
   // Render a responsive bar/line chart using SVG
   const monthData = [
@@ -35,7 +529,7 @@ export default function ReportsHistoryView({
         <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Analyze manufacturing cost expenditures, check PO archives, and inspect material consumption by Lot.</p>
       </div>
 
-      {/* Tab navigation */}
+      {/* Sub-tab navigation */}
       <div className="print-hide" style={{
         display: 'flex',
         backgroundColor: 'var(--bg-secondary)',
@@ -43,29 +537,9 @@ export default function ReportsHistoryView({
         borderRadius: 'var(--border-radius-sm)',
         border: '1px solid var(--border-color)',
         marginBottom: '24px',
-        width: 'fit-content'
+        width: 'fit-content',
+        gap: '4px'
       }}>
-        <button
-          type="button"
-          onClick={() => setActiveReportTab('procurement')}
-          style={{
-            padding: '8px 16px',
-            fontSize: '13px',
-            fontWeight: '600',
-            borderRadius: '6px',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: activeReportTab === 'procurement' ? 'var(--accent-color)' : 'transparent',
-            color: activeReportTab === 'procurement' ? '#ffffff' : 'var(--text-main)',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}
-        >
-          <DollarSign size={14} />
-          <span>Procurement Expenses</span>
-        </button>
         <button
           type="button"
           onClick={() => setActiveReportTab('material_ledger')}
@@ -85,188 +559,73 @@ export default function ReportsHistoryView({
           }}
         >
           <ClipboardList size={14} />
-          <span>Material Issue & Return Ledger</span>
+          <span>Material Ledger</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('designer_audits')}
+          style={{
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: '600',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: activeReportTab === 'designer_audits' ? 'var(--accent-color)' : 'transparent',
+            color: activeReportTab === 'designer_audits' ? '#ffffff' : 'var(--text-main)',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Users size={14} />
+          <span>Designer Audits</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('store_audits')}
+          style={{
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: '600',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: activeReportTab === 'store_audits' ? 'var(--accent-color)' : 'transparent',
+            color: activeReportTab === 'store_audits' ? '#ffffff' : 'var(--text-main)',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Scale size={14} />
+          <span>Store Audits</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveReportTab('po_tracking')}
+          style={{
+            padding: '8px 16px',
+            fontSize: '13px',
+            fontWeight: '600',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: activeReportTab === 'po_tracking' ? 'var(--accent-color)' : 'transparent',
+            color: activeReportTab === 'po_tracking' ? '#ffffff' : 'var(--text-main)',
+            transition: 'all 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}
+        >
+          <Truck size={14} />
+          <span>PO Sourcing Tracking</span>
         </button>
       </div>
 
-      {activeReportTab === 'procurement' && (
-        <>
-          {/* Analytics Summary */}
-          <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <div className="stat-card">
-              <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
-                <DollarSign size={24} />
-              </div>
-              <span className="stat-title">Total PO Value Issued</span>
-              <span className="stat-value">
-                {currencySymbol} {totalPOValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
-                <TrendingUp size={24} />
-              </div>
-              <span className="stat-title">Total Procurement Tax</span>
-              <span className="stat-value">
-                {currencySymbol} {totalTaxPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-
-            <div className="stat-card">
-              <div className="stat-icon-wrapper" style={{ backgroundColor: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4' }}>
-                <FileText size={24} />
-              </div>
-              <span className="stat-title">Purchase Orders Transacted</span>
-              <span className="stat-value">{activePOUnits} POs</span>
-            </div>
-          </div>
-
-          {/* Expenditures Chart Panel */}
-          <div className="panel animate-scale">
-            <div className="panel-header">
-              <h3 className="panel-title">
-                <TrendingUp size={18} className="text-accent" />
-                Purchasing Expenditure History (Current Season)
-              </h3>
-            </div>
-
-            {/* SVG Graph */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <svg width="100%" height="220" viewBox="0 0 600 200" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
-                {/* Horizontal Grid Lines */}
-                <line x1="40" y1="20" x2="580" y2="20" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="40" y1="65" x2="580" y2="65" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="40" y1="110" x2="580" y2="110" stroke="#f1f5f9" strokeWidth="1" />
-                <line x1="40" y1="150" x2="580" y2="150" stroke="#e2e8f0" strokeWidth="1.5" />
-
-                {/* Y Axis Labels */}
-                <text x="5" y="25" fill="#94a3b8" fontSize="9" fontFamily="var(--font-family-body)">{currencySymbol} {(maxVal * 0.8 / 1000).toFixed(0)}k</text>
-                <text x="5" y="70" fill="#94a3b8" fontSize="9" fontFamily="var(--font-family-body)">{currencySymbol} {(maxVal * 0.5 / 1000).toFixed(0)}k</text>
-                <text x="5" y="115" fill="#94a3b8" fontSize="9" fontFamily="var(--font-family-body)">{currencySymbol} {(maxVal * 0.2 / 1000).toFixed(0)}k</text>
-                <text x="5" y="155" fill="#94a3b8" fontSize="9" fontFamily="var(--font-family-body)">0</text>
-
-                {/* Drawing Bars */}
-                {monthData.map((d, index) => {
-                  const x = 70 + (index * 135);
-                  const height = (d.amount / maxVal) * 130;
-                  const y = 150 - height;
-                  const barWidth = 45;
-
-                  return (
-                    <g key={index} className="animate-scale">
-                      {/* Bar shadow */}
-                      <rect 
-                        x={x} 
-                        y={y} 
-                        width={barWidth} 
-                        height={height} 
-                        fill="var(--accent-color)" 
-                        opacity="0.9"
-                        rx="4"
-                      />
-                      {/* Label */}
-                      <text 
-                        x={x + (barWidth / 2)} 
-                        y="170" 
-                        fill="var(--text-main)" 
-                        fontSize="11" 
-                        fontWeight="500"
-                        fontFamily="var(--font-family-title)"
-                        textAnchor="middle"
-                      >
-                        {d.label}
-                      </text>
-                      {/* Value */}
-                      <text 
-                        x={x + (barWidth / 2)} 
-                        y={y - 8} 
-                        fill="var(--accent-color)" 
-                        fontSize="10" 
-                        fontWeight="bold"
-                        fontFamily="var(--font-family-body)"
-                        textAnchor="middle"
-                      >
-                        {currencySymbol}{Math.round(d.amount).toLocaleString()}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-          </div>
-
-          {/* PO Archives list */}
-          <div className="panel">
-            <div className="panel-header">
-              <h3 className="panel-title">
-                <FileText size={18} className="text-accent" />
-                Historic Issued Purchase Orders
-              </h3>
-            </div>
-
-            <div className="custom-table-container">
-              <table className="custom-table">
-                <thead>
-                  <tr>
-                    <th>PO Number</th>
-                    <th>Supplier Vendor</th>
-                    <th>Design Context</th>
-                    <th>Issued Date</th>
-                    <th>Target Delivery</th>
-                    <th>Total Cost</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pos.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-                        No purchase orders have been transacted yet. Go to <strong>Generate PO</strong> to create one.
-                      </td>
-                    </tr>
-                  ) : (
-                    pos.map((po) => (
-                      <tr key={po.id}>
-                        <td style={{ fontWeight: 'bold' }}>{po.poNumber}</td>
-                        <td>{po.vendorName}</td>
-                        <td>{po.designName ? `${po.designName} (${po.designCategory})` : 'Manual Purchase'}</td>
-                        <td>{po.date}</td>
-                        <td>{po.deliveryDate}</td>
-                        <td style={{ fontWeight: 'bold', color: 'var(--accent-color)' }}>
-                          {currencySymbol} {po.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <PDFDownloadLink 
-                              document={<PDFDocument po={po} currencySymbol={currencySymbol} />} 
-                              fileName={`PO_${po.poNumber}.pdf`}
-                              className="btn btn-secondary btn-sm"
-                              style={{ textDecoration: 'none', padding: '6px' }}
-                            >
-                              {({ loading }) => (
-                                <Download size={14} style={{ color: 'var(--accent-color)' }} />
-                              )}
-                            </PDFDownloadLink>
-                            
-                            <button 
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => setSelectedPo(po)}
-                              style={{ padding: '6px' }}
-                            >
-                              <Printer size={14} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      )}
 
       {activeReportTab === 'material_ledger' && (
         <div className="animate-scale">
@@ -495,9 +854,741 @@ export default function ReportsHistoryView({
             <div className="panel" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
               <ClipboardList size={48} strokeWidth={1} style={{ marginBottom: '12px', color: 'var(--text-light)', display: 'inline-block' }} />
               <h3 style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-main)' }}>Select a Lot Number</h3>
-              <p style={{ fontSize: '14px', marginTop: '4px' }}>Please choose a manufacturing lot from the dropdown above to display its consumption report ledger.</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Designer Audits View */}
+      {activeReportTab === 'designer_audits' && (
+        <div className="panel animate-scale">
+          <div style={{ display: 'block', padding: '20px 20px 0 20px' }}>
+            <div style={styles.headerRow}>
+              <h3 style={styles.title}>
+                <Users size={18} style={{ color: 'var(--accent-color)' }} />
+                <span>Designer & Specification Audit Trail</span>
+              </h3>
+              <button
+                className="btn btn-secondary btn-sm print-hide"
+                onClick={() => window.print()}
+                style={styles.btn}
+              >
+                <Printer size={14} />
+                <span>Print Report</span>
+              </button>
+            </div>
+            <div style={styles.filterBar} className="print-hide">
+              <div style={styles.inputWrapper}>
+                <span style={styles.inputIcon}>
+                  <Search size={14} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search lot, details, actor..."
+                  value={dhSearchQuery}
+                  onChange={(e) => setDhSearchQuery(e.target.value)}
+                  style={styles.input}
+                />
+              </div>
+              <select
+                value={dhActionFilter}
+                onChange={(e) => setDhActionFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All Actions</option>
+                <option value="created">Created</option>
+                <option value="approved">Approved</option>
+                <option value="verified">Verified</option>
+                <option value="edited">Edited</option>
+              </select>
+              <select
+                value={dhDateFilter}
+                onChange={(e) => setDhDateFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+              </select>
+              <select
+                value={dhSort}
+                onChange={(e) => setDhSort(e.target.value)}
+                style={styles.select}
+              >
+                <option value="latest">⬇ Latest First</option>
+                <option value="oldest">⬆ Oldest First</option>
+              </select>
+              {(dhSearchQuery || dhActionFilter !== 'all' || dhDateFilter !== 'all' || dhSort !== 'latest') && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { setDhSearchQuery(''); setDhActionFilter('all'); setDhDateFilter('all'); setDhSort('latest'); }}
+                  style={{ ...styles.btn, padding: '0 12px' }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="custom-table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Lot ID</th>
+                  <th>Action</th>
+                  <th>Operator</th>
+                  <th>Details Log</th>
+                  <th>Timestamp</th>
+                  <th style={{ textAlign: 'center' }}>Workflows</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDesignerAudits.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+                      No design audit records matching criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredDesignerAudits.map((h, idx) => {
+                    const act = String(h.action || 'created').toLowerCase();
+                    const badgeColor = act.includes('created') || act.includes('init')
+                      ? { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' }
+                      : act.includes('approve')
+                      ? { backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }
+                      : act.includes('verify')
+                      ? { backgroundColor: 'rgba(6, 182, 212, 0.12)', color: '#06b6d4' }
+                      : { backgroundColor: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6' };
+
+                    const detailData = getLotAuditDetails(h.lotId);
+                    const hasDetails = detailData.pos.length > 0 || detailData.rgps.length > 0 || detailData.zips.length > 0 || detailData.dooris.length > 0;
+
+                    return (
+                      <React.Fragment key={h.id || idx}>
+                        <tr style={{ cursor: hasDetails ? 'pointer' : 'default' }} onClick={() => hasDetails && setExpandedLotId(expandedLotId === h.lotId ? null : h.lotId)}>
+                          <td style={{ fontWeight: 'bold', color: 'var(--accent-color)' }}>Lot #{h.lotId}</td>
+                          <td>
+                            <span className="status-badge" style={{ ...badgeColor, textTransform: 'uppercase', fontWeight: 'bold', fontSize: '10px' }}>
+                              {h.action}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: '600' }}>{h.actorName}</td>
+                          <td style={{ fontSize: '13px' }}>{h.details}</td>
+                          <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{h.timestamp}</td>
+                          <td style={{ textAlign: 'center' }}>
+                            {hasDetails ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '2px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedLotId(expandedLotId === h.lotId ? null : h.lotId);
+                                }}
+                              >
+                                {expandedLotId === h.lotId ? 'Hide Logs' : 'Inspect Details'}
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No Docs</span>
+                            )}
+                          </td>
+                        </tr>
+                        {expandedLotId === h.lotId && hasDetails && (
+                          <tr style={{ background: 'var(--bg-primary, #f8fafc)' }}>
+                            <td colSpan="6" style={{ padding: '16px', borderLeft: '4px solid var(--accent-color)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <h4 style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                    🔍 Linked Sourcing Records & POs (Lot #{h.lotId})
+                                  </h4>
+                                </div>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                  
+                                  {/* Standard Purchase Orders */}
+                                  <div style={{ background: 'var(--bg-secondary, #ffffff)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', textTransform: 'uppercase' }}>
+                                      🛒 Standard POs ({detailData.pos.length})
+                                    </span>
+                                    {detailData.pos.length === 0 ? (
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No standard POs generated.</span>
+                                    ) : (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {detailData.pos.map((po, pIdx) => (
+                                          <div key={pIdx} style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-color)', paddingBottom: '4px' }}>
+                                            <span><strong>{po.poNumber}</strong> ({po.vendorName})</span>
+                                            <span style={{ fontWeight: '700', color: '#10b981' }}>{currencySymbol} {po.total.toFixed(2)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Returnable Gate Passes (RGPs) */}
+                                  <div style={{ background: 'var(--bg-secondary, #ffffff)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', textTransform: 'uppercase' }}>
+                                      🚪 Returnable Gate Pass (RGP) ({detailData.rgps.length})
+                                    </span>
+                                    {detailData.rgps.length === 0 ? (
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No RGP scans logged.</span>
+                                    ) : (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {detailData.rgps.map((s, rIdx) => (
+                                          <div key={rIdx} style={{ fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px dashed var(--border-color)', paddingBottom: '4px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                              <strong>{s.material_name}</strong>
+                                              <span style={{ fontWeight: '600' }}>Qty: {s.quantity}</span>
+                                            </div>
+                                            <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Supplier: {s.supplier_name} | By: {s.person_name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Zip POs */}
+                                  <div style={{ background: 'var(--bg-secondary, #ffffff)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', textTransform: 'uppercase' }}>
+                                      ⚡ Zip POs ({detailData.zips.length})
+                                    </span>
+                                    {detailData.zips.length === 0 ? (
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No Zip POs generated.</span>
+                                    ) : (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {detailData.zips.map((z, zIdx) => (
+                                          <div key={zIdx} style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-color)', paddingBottom: '4px' }}>
+                                            <span>Style: <strong>{z.Style}</strong> (Sup: {z.Supervisor})</span>
+                                            <span style={{ fontWeight: '700', color: '#10b981' }}>{currencySymbol} {z.Total_Cost.toFixed(2)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Doori POs */}
+                                  <div style={{ background: 'var(--bg-secondary, #ffffff)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', textTransform: 'uppercase' }}>
+                                      🧵 Doori POs ({detailData.dooris.length})
+                                    </span>
+                                    {detailData.dooris.length === 0 ? (
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No Doori POs generated.</span>
+                                    ) : (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {detailData.dooris.map((d, dIdx) => (
+                                          <div key={dIdx} style={{ fontSize: '11px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-color)', paddingBottom: '4px' }}>
+                                            <span>Style: <strong>{d.Style}</strong> (Sup: {d.Supervisor})</span>
+                                            <span style={{ fontWeight: '700', color: '#10b981' }}>{currencySymbol} {d.Total_Cost.toFixed(2)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Store Audits View */}
+      {activeReportTab === 'store_audits' && (
+        <div className="panel animate-scale">
+          <div style={{ display: 'block', padding: '20px 20px 0 20px' }}>
+            <div style={styles.headerRow}>
+              <h3 style={styles.title}>
+                <Scale size={18} style={{ color: 'var(--accent-color)' }} />
+                <span>Store Inventory Sourcing & Issue Audits</span>
+              </h3>
+              <button
+                className="btn btn-secondary btn-sm print-hide"
+                onClick={() => window.print()}
+                style={styles.btn}
+              >
+                <Printer size={14} />
+                <span>Print Report</span>
+              </button>
+            </div>
+            <div style={styles.filterBar} className="print-hide">
+              <div style={styles.inputWrapper}>
+                <span style={styles.inputIcon}>
+                  <Search size={14} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search details, operator..."
+                  value={saSearchQuery}
+                  onChange={(e) => setSaSearchQuery(e.target.value)}
+                  style={styles.input}
+                />
+              </div>
+              <select
+                value={saTypeFilter}
+                onChange={(e) => setSaTypeFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All Events</option>
+                <option value="issue">Issues</option>
+                <option value="return">Returns</option>
+                <option value="transfer">Transfers</option>
+                <option value="weight">Weight Captures</option>
+              </select>
+              <select
+                value={saDateFilter}
+                onChange={(e) => setSaDateFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+              </select>
+              <select
+                value={saSort}
+                onChange={(e) => setSaSort(e.target.value)}
+                style={styles.select}
+              >
+                <option value="latest">⬇ Latest First</option>
+                <option value="oldest">⬆ Oldest First</option>
+              </select>
+              {(saSearchQuery || saTypeFilter !== 'all' || saDateFilter !== 'all' || saSort !== 'latest') && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { setSaSearchQuery(''); setSaTypeFilter('all'); setSaDateFilter('all'); setSaSort('latest'); }}
+                  style={{ ...styles.btn, padding: '0 12px' }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="custom-table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>Log Ref</th>
+                  <th>Event Type</th>
+                  <th>Operator</th>
+                  <th>Action Details</th>
+                  <th>Timestamp</th>
+                  <th style={{ textAlign: 'center' }}>Workflows</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStoreAudits.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+                      No store audit logs matching criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStoreAudits.map((s, idx) => {
+                    const badgeColor = s.tag === 'issue'
+                      ? { backgroundColor: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' }
+                      : s.tag === 'return'
+                      ? { backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#10b981' }
+                      : s.tag === 'transfer'
+                      ? { backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' }
+                      : { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' };
+
+                    const detailObj = getStoreLogDetails(s.id);
+                    const hasDetails = !!detailObj;
+
+                    return (
+                      <React.Fragment key={s.id || idx}>
+                        <tr style={{ cursor: hasDetails ? 'pointer' : 'default' }} onClick={() => hasDetails && setExpandedStoreLogId(expandedStoreLogId === s.id ? null : s.id)}>
+                          <td style={{ fontWeight: 'bold', color: 'var(--text-muted)', fontSize: '12px' }}>{s.id}</td>
+                          <td>
+                            <span className="status-badge" style={{ ...badgeColor, fontWeight: 'bold', fontSize: '10px' }}>
+                              {s.type}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: '600' }}>{s.operator}</td>
+                          <td style={{ fontSize: '13px' }}>{s.details}</td>
+                          <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {s.date ? new Date(s.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {hasDetails ? (
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                style={{ padding: '2px 8px', fontSize: '11px', whiteSpace: 'nowrap' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedStoreLogId(expandedStoreLogId === s.id ? null : s.id);
+                                }}
+                              >
+                                {expandedStoreLogId === s.id ? 'Hide details' : 'Inspect'}
+                              </button>
+                            ) : (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No Details</span>
+                            )}
+                          </td>
+                        </tr>
+                        {expandedStoreLogId === s.id && hasDetails && (
+                          <tr style={{ background: 'var(--bg-primary, #f8fafc)' }}>
+                            <td colSpan="6" style={{ padding: '16px', borderLeft: '4px solid var(--accent-color)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <h4 style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-main)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', marginBottom: '8px' }}>
+                                  📦 Detailed Transaction Properties — {s.type} Log ({s.id})
+                                </h4>
+                                
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                                  {/* Render properties dynamically depending on the log type */}
+                                  {(detailObj.type === 'IS' || detailObj.type === 'RT') && (
+                                    <>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Manufacturing Lot</span>
+                                        <strong>Lot #{detailObj.data.lotId}</strong>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Material description</span>
+                                        <strong>{detailObj.data.materialName} ({detailObj.data.materialCode})</strong>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>supervisor / Department</span>
+                                        <span>{detailObj.data.supervisor} / {detailObj.data.department}</span>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Quantity issue / return</span>
+                                        <span style={{ fontWeight: 'bold', color: detailObj.type === 'IS' ? '#ef4444' : '#10b981' }}>
+                                          {detailObj.type === 'IS' ? `${detailObj.data.qtyIssued} units issued` : `${detailObj.data.returnedQty} units returned`}
+                                        </span>
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {detailObj.type === 'TR' && (
+                                    <>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Material Description</span>
+                                        <strong>{detailObj.data.materialName} ({detailObj.data.materialCode})</strong>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>From Location</span>
+                                        <span>{detailObj.data.fromLocation || 'Store Bin'}</span>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>To Location</span>
+                                        <span>{detailObj.data.toLocation}</span>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Transfer quantity</span>
+                                        <strong style={{ color: 'var(--accent-color)' }}>{detailObj.data.qty} units</strong>
+                                      </div>
+                                    </>
+                                  )}
+
+                                  {detailObj.type === 'WC' && (
+                                    <>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Associated Lot</span>
+                                        <strong>Lot #{detailObj.data.lotNo}</strong>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>material name</span>
+                                        <strong>{detailObj.data.materialName}</strong>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Net weight / piece weight</span>
+                                        <strong>{Number(detailObj.data.netWeightKg).toFixed(3)} kg</strong>
+                                      </div>
+                                      <div style={{ fontSize: '12px' }}>
+                                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '10px', textTransform: 'uppercase' }}>Total pieces / Packets</span>
+                                        <span>{detailObj.data.pieces} pcs / {detailObj.data.packets} pkts</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* PO Sourcing Tracking View */}
+      {activeReportTab === 'po_tracking' && (
+        <div className="panel animate-scale">
+          <div style={{ display: 'block', padding: '20px 20px 0 20px' }}>
+            <div style={styles.headerRow}>
+              <h3 style={styles.title}>
+                <Truck size={18} style={{ color: 'var(--accent-color)' }} />
+                <span>PO & Sourcing Receipt Lifecycle Tracking</span>
+              </h3>
+              <button
+                className="btn btn-secondary btn-sm print-hide"
+                onClick={() => window.print()}
+                style={styles.btn}
+              >
+                <Printer size={14} />
+                <span>Print Report</span>
+              </button>
+            </div>
+            
+            <div style={styles.filterBar} className="print-hide">
+              <div style={styles.inputWrapper}>
+                <span style={styles.inputIcon}>
+                  <Search size={14} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search PO, Lot, Supplier, Gate..."
+                  value={ptSearchQuery}
+                  onChange={(e) => setPtSearchQuery(e.target.value)}
+                  style={styles.input}
+                />
+              </div>
+              <select
+                value={ptTypeFilter}
+                onChange={(e) => setPtTypeFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All PO Types</option>
+                <option value="normal">Normal PO</option>
+                <option value="zip">Zip PO</option>
+                <option value="doori">Doori PO</option>
+                <option value="rgp">RGP PO</option>
+              </select>
+              <select
+                value={ptStatusFilter}
+                onChange={(e) => setPtStatusFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All Statuses</option>
+                <option value="fully">Fully Received</option>
+                <option value="partially">Partially Received</option>
+                <option value="gate_entered">Gate Entered</option>
+                <option value="pending">Pending</option>
+              </select>
+              <select
+                value={ptDateFilter}
+                onChange={(e) => setPtDateFilter(e.target.value)}
+                style={styles.select}
+              >
+                <option value="all">All Dates</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+              </select>
+              <select
+                value={ptSort}
+                onChange={(e) => setPtSort(e.target.value)}
+                style={styles.select}
+              >
+                <option value="latest">⬇ Latest First</option>
+                <option value="oldest">⬆ Oldest First</option>
+              </select>
+              {(ptSearchQuery || ptTypeFilter !== 'all' || ptStatusFilter !== 'all' || ptDateFilter !== 'all' || ptSort !== 'latest') && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { setPtSearchQuery(''); setPtTypeFilter('all'); setPtStatusFilter('all'); setPtDateFilter('all'); setPtSort('latest'); }}
+                  style={{ ...styles.btn, padding: '0 12px' }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="custom-table-container">
+            <table className="custom-table">
+              <thead>
+                <tr>
+                  <th>PO Reference</th>
+                  <th>PO Type</th>
+                  <th>Design Lot</th>
+                  <th>Supplier / Vendor</th>
+                  <th style={{ textAlign: 'right' }}>Requested</th>
+                  <th style={{ textAlign: 'right' }}>Received</th>
+                  <th style={{ textAlign: 'right' }}>Balance</th>
+                  <th style={{ textAlign: 'center' }}>Sourcing Status</th>
+                  <th style={{ textAlign: 'center' }}>Workflows</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPtList.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
+                      No PO sourcing records matching criteria.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPtList.map((item, idx) => {
+                    const balance = Math.max(0, item.requestedQty - item.receivedQty);
+                    
+                    // Determine Status
+                    let statusLabel = 'Pending';
+                    let badgeColor = { backgroundColor: 'rgba(239, 68, 68, 0.12)', color: '#ef4444' };
+                    
+                    if (item.receivedQty >= item.requestedQty && item.requestedQty > 0) {
+                      statusLabel = 'Fully Received';
+                      badgeColor = { backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#10b981' };
+                    } else if (item.receivedQty > 0 && item.receivedQty < item.requestedQty) {
+                      statusLabel = 'Partially Received';
+                      badgeColor = { backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b' };
+                    } else if (item.gatePerson && item.gatePerson !== '—') {
+                      statusLabel = 'Gate Entered';
+                      badgeColor = { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6' };
+                    }
+
+                    // Grab all scans related to this lot/PO to show detailed scanner history
+                    const lotStr = String(item.lotId).toLowerCase().trim();
+                    const relatedScans = (scans || []).filter(s => 
+                      String(s.lot_number).toLowerCase().trim() === lotStr ||
+                      String(s.lot_number).toLowerCase().trim() === String(item.id).toLowerCase().trim()
+                    );
+
+                    return (
+                      <React.Fragment key={item.id || idx}>
+                        <tr style={{ cursor: 'pointer' }} onClick={() => setExpandedPtId(expandedPtId === item.id ? null : item.id)}>
+                          <td style={{ fontWeight: 'bold', color: 'var(--text-muted)' }}>{item.id}</td>
+                          <td>
+                            <span className="status-badge" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-main)', fontSize: '11px', fontWeight: '600' }}>
+                              {item.type}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="status-badge" style={{ backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', fontSize: '11px', fontWeight: 'bold' }}>
+                              Lot #{item.lotId}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: '500' }}>{item.supplier}</td>
+                          <td style={{ textAlign: 'right', fontWeight: '600' }}>{item.requestedQty} pcs</td>
+                          <td style={{ textAlign: 'right', fontWeight: '600', color: '#10b981' }}>{item.receivedQty} pcs</td>
+                          <td style={{ textAlign: 'right', fontWeight: '600', color: balance > 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                            {balance} pcs
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="status-badge" style={{ ...badgeColor, fontWeight: 'bold', fontSize: '10px' }}>
+                              {statusLabel}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ padding: '2px 8px', fontSize: '11px' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedPtId(expandedPtId === item.id ? null : item.id);
+                              }}
+                            >
+                              {expandedPtId === item.id ? 'Hide' : 'Scanner Details'}
+                            </button>
+                          </td>
+                        </tr>
+                        {expandedPtId === item.id && (
+                          <tr style={{ background: 'var(--bg-primary, #f8fafc)' }}>
+                            <td colSpan="9" style={{ padding: '20px', borderLeft: '4px solid var(--accent-color)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                  <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <h4 style={{ fontSize: '11px', fontWeight: '800', color: '#333', textTransform: 'uppercase', margin: '0 0 8px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                                      🛡️ Security Gate Check-in
+                                    </h4>
+                                    <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div><span style={{ color: '#666' }}>Officer:</span> <strong>{item.gatePerson}</strong></div>
+                                      <div><span style={{ color: '#666' }}>Checked In:</span> <strong>{item.gateDate}</strong></div>
+                                      <div><span style={{ color: '#666' }}>Security Clear:</span> <strong style={{ color: '#10b981' }}>PASSED</strong></div>
+                                    </div>
+                                  </div>
+
+                                  <div style={{ backgroundColor: '#ffffff', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <h4 style={{ fontSize: '11px', fontWeight: '800', color: '#333', textTransform: 'uppercase', margin: '0 0 8px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '4px' }}>
+                                      📦 Warehouse Store Receipt
+                                    </h4>
+                                    <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div><span style={{ color: '#666' }}>Store Operator:</span> <strong>{item.receiver}</strong></div>
+                                      <div><span style={{ color: '#666' }}>Checked In:</span> <strong>{item.receivedDate}</strong></div>
+                                      <div>
+                                        <span style={{ color: '#666' }}>Status: </span>
+                                        <strong style={{ color: item.receivedQty >= item.requestedQty ? '#10b981' : '#f59e0b' }}>
+                                          {item.receivedQty} / {item.requestedQty} Verified
+                                        </strong>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <h4 style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-main)', textTransform: 'uppercase', margin: '0 0 8px 0' }}>
+                                    📊 Real-time Handheld Scanner History Logs
+                                  </h4>
+                                  {relatedScans.length === 0 ? (
+                                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                      No scans recorded for this lot yet.
+                                    </p>
+                                  ) : (
+                                    <div className="custom-table-container" style={{ maxHeight: '180px', overflowY: 'auto' }}>
+                                      <table className="custom-table" style={{ margin: 0, fontSize: '11px' }}>
+                                        <thead>
+                                          <tr>
+                                            <th>Scanner Action</th>
+                                            <th>Scanned By</th>
+                                            <th style={{ textAlign: 'right' }}>Scanned Qty</th>
+                                            <th>Timestamp</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {relatedScans.map((scan, sIdx) => {
+                                            const scanBadge = scan.scan_type === 'gate_entry'
+                                              ? { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', label: 'Gate Entry Check' }
+                                              : scan.scan_type === 'material_in'
+                                              ? { backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#10b981', label: 'Store Material In' }
+                                              : scan.scan_type === 'rgp_entry'
+                                              ? { backgroundColor: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', label: 'RGP Dispatch' }
+                                              : { backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', label: 'RGP Return In' };
+
+                                            return (
+                                              <tr key={scan.id || sIdx}>
+                                                <td>
+                                                  <span className="status-badge" style={{ ...scanBadge, padding: '2px 6px', fontWeight: 'bold' }}>
+                                                    {scanBadge.label}
+                                                  </span>
+                                                </td>
+                                                <td style={{ fontWeight: '600' }}>{scan.person_name}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{scan.quantity} pcs</td>
+                                                <td>
+                                                  {new Date(scan.scanned_at || scan.timestamp).toLocaleDateString('en-IN', {
+                                                    day: '2-digit', month: 'short', year: 'numeric',
+                                                    hour: '2-digit', minute: '2-digit'
+                                                  })}
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

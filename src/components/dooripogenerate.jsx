@@ -1241,6 +1241,7 @@ const saveOrderToSheet = async (matrix, formData, totalCost) => {
 // ============================
 // Optimized React Component
 // ============================
+// eslint-disable-next-line react-refresh/only-export-components
 export const generateIssuePdf = async (matrix, {
     issueDate,
     supervisor,
@@ -1250,7 +1251,8 @@ export const generateIssuePdf = async (matrix, {
     placementQuantities,
     placementZipTypes,
     zipQualityData,
-    blockedShades
+    blockedShades,
+    poNumber
 }) => {
     if (!matrix) return;
 
@@ -1412,7 +1414,16 @@ export const generateIssuePdf = async (matrix, {
         const lotNumberText = cleanString(matrix.lotNumber || 'LOT NO. UNKNOWN');
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(18);
-        doc.text(`LOT NO: ${lotNumberText}`, centerPoint, headerTitleY + 45, { align: 'center' });
+        doc.text(`LOT NO: ${lotNumberText}`, centerPoint, headerTitleY + 40, { align: 'center' });
+
+        // Show PO Number prominently
+        if (poNumber) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(0, 80, 180);
+            doc.text(`PO NO: ${poNumber}`, centerPoint, headerTitleY + 58, { align: 'center' });
+            doc.setTextColor(0);
+        }
 
         const fieldsY = boxY + boxSize + 15;
         const fieldH = 20;
@@ -1789,7 +1800,9 @@ export const generateIssuePdf = async (matrix, {
     drawFooterWithSignatures();
     drawSimpleFooter(currentPage, pageCount);
 
-    const fname = `Lot_${cleanString(matrix.lotNumber || 'Unknown')}_Purchase_Order_${filenameDatePart(issueDate)}.pdf`;
+    const fname = poNumber
+        ? `${poNumber}_Lot_${cleanString(matrix.lotNumber || 'Unknown')}_${filenameDatePart(issueDate)}.pdf`
+        : `Lot_${cleanString(matrix.lotNumber || 'Unknown')}_Purchase_Order_${filenameDatePart(issueDate)}.pdf`;
     doc.save(fname);
 
     // Save order data to Google Sheets
@@ -1816,7 +1829,8 @@ export const generateIssuePdf = async (matrix, {
         message: saveResult.message,
         pendingData: pendingData,
         selectedPieces: selectedTotalPieces,
-        totalPieces: matrix.totals.grand
+        totalPieces: matrix.totals.grand,
+        totalZipCost: totalZipCost
     };
 };
 export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () => { }, viewMode = 'dashboard', setViewMode = () => { } } = {}) {
@@ -2288,6 +2302,16 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
         try {
             addSupervisorToOptions(supervisor);
 
+            // Fetch unique DORI PO number from backend
+            let poNumber = '';
+            try {
+                const poRes = await fetch(`${getBackendUrl()}/api/po-number/next/doori`);
+                const poData = await poRes.json();
+                poNumber = poData.poNumber || '';
+            } catch (e) {
+                console.warn('Could not fetch DORI PO number:', e);
+            }
+
             // Generate PDF with selected shades data
             const result = await generateIssuePdf(matrix, {
                 issueDate,
@@ -2298,7 +2322,8 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
                 placementQuantities,
                 placementZipTypes,
                 zipQualityData,
-                blockedShades // Add blockedShades here
+                blockedShades,
+                poNumber
             });
 
             setShowIssueDialog(false);
@@ -2315,6 +2340,8 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
                         placementQuantities,
                         placementZipTypes,
                         zipQualityData,
+                        totalCost: result.totalZipCost || 0,
+                        poNumber,
                     };
                     await fetch(`${getBackendUrl()}/api/doori-orders/${matrix.lotNumber}/payload`, {
                         method: 'PUT',
@@ -2324,7 +2351,11 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
                             Dori_Selections: JSON.stringify(zipSelections),
                             Selected_Placements: JSON.stringify(selectedPlacements),
                             Placement_Quantities: JSON.stringify(placementQuantities),
-                            Placement_Dori_Types: JSON.stringify(placementZipTypes)
+                            Placement_Dori_Types: JSON.stringify(placementZipTypes),
+                            Total_Cost: result.totalZipCost || 0,
+                            po_number: poNumber,
+                            Supervisor: supervisor || '',
+                            Issue_Date: issueDate || ''
                         })
                     });
                 } catch (saveErr) {
@@ -4051,60 +4082,72 @@ export function DoriDashboard({ onCompileNewPO }) {
         setLoading(true);
         setError('');
         try {
-            const scansRes = await fetch(`${backendUrl}/api/scans`);
-            const localScans = scansRes.ok ? await scansRes.json() : [];
-
+            // Fetch directly from doori table — only lots with real Dori PO data
             const poRes = await fetch(`${backendUrl}/api/doori-orders`);
-            if (!poRes.ok) throw new Error('Failed to fetch PO list from database');
+            if (!poRes.ok) throw new Error('Failed to fetch Dori PO list from database');
             const data = await poRes.json();
 
-            const parsedPOs = data.map(row => {
+            // Filter to only rows that have actual doori PO data (Supervisor or Dori_Selections set)
+            const realEntries = data.filter(row =>
+                (row.Dori_Selections || row.Supervisor) &&
+                row.po_number && String(row.po_number).trim() !== ''
+            );
+
+            const cleanStr = (val) => {
+                if (!val || val === 'nan') return '';
+                return String(val).trim();
+            };
+
+            const parsedPOs = realEntries.map(row => {
                 const lotNumber = String(row.Lot_Number || '').trim();
                 if (!lotNumber) return null;
 
-                const lotScans = Array.isArray(localScans) ? localScans.filter(s => String(s.lot_number).trim() === lotNumber) : [];
-                const localGateScan = lotScans.find(s => s.scan_type === 'gate_entry');
-                const localMatScan = lotScans.find(s => s.scan_type === 'material_in');
-                const localSupScan = lotScans.find(s => s.scan_type === 'supplier_entry');
-
-                const cleanStr = (val) => {
-                    if (!val || val === 'nan') return '';
-                    return String(val).trim();
-                };
-
-                const gatePerson = cleanStr(row.Gate_Entry_Person) || localGateScan?.person_name || '';
-                const gateDate = cleanStr(row.Gate_Entry_Date) || (localGateScan?.scanned_at ? new Date(localGateScan.scanned_at).toLocaleDateString('en-GB') : '') || '';
+                // Gate entry directly from doori table columns
+                const gatePerson = cleanStr(row.Gate_Entry_Person);
+                const gateDate = cleanStr(row.Gate_Entry_Date)
+                    ? new Date(row.Gate_Entry_Date).toLocaleDateString('en-GB')
+                    : '';
                 const gateDone = !!gatePerson;
 
-                const matPerson = cleanStr(row.Material_Received_By) || localMatScan?.person_name || '';
-                const matDate = cleanStr(row.Material_Received_Date) || (localMatScan?.scanned_at ? new Date(localMatScan.scanned_at).toLocaleDateString('en-GB') : '') || '';
+                const matPerson = cleanStr(row.Material_Received_By);
+                const matDate = cleanStr(row.Material_Received_Date)
+                    ? new Date(row.Material_Received_Date).toLocaleDateString('en-GB')
+                    : '';
                 const matDone = !!matPerson;
 
-                const supPerson = cleanStr(row.Supplier_Name) || localSupScan?.person_name || '';
-                const supDate = cleanStr(row.Material_Entry_Date) || (localSupScan?.scanned_at ? new Date(localSupScan.scanned_at).toLocaleDateString('en-GB') : '') || '';
+                const supPerson = cleanStr(row.Supplier_Name);
+                const supDate = cleanStr(row.Material_Entry_Date)
+                    ? new Date(row.Material_Entry_Date).toLocaleDateString('en-GB')
+                    : '';
                 const supDone = !!supPerson;
 
-                const placementsRaw = row.Selected_Placements || '';
-                let placements = placementsRaw;
+                // Parse placements from doori table
+                let placements = '';
                 try {
+                    const placementsRaw = row.Selected_Placements || '';
                     if (placementsRaw.startsWith('[') || placementsRaw.startsWith('{')) {
                         const parsedArr = JSON.parse(placementsRaw);
                         placements = Array.isArray(parsedArr) ? parsedArr.join(', ') : placementsRaw;
+                    } else {
+                        placements = placementsRaw;
                     }
                 } catch (_) { }
 
-                const issueDateStr = row.Issue_Date || row.Timestamp || '';
+                const issueDateStr = cleanStr(row.Issue_Date) || cleanStr(row.Timestamp) || '';
                 const aging = calculateAging(issueDateStr, gateDate, matDate, supDate);
 
                 return {
+                    id: row.id,
+                    version: parseInt(row.version) || 1,
                     lotNumber,
                     garmentType: row.Garment_Type || '',
                     style: row.Style || '',
                     fabric: row.Fabric || '',
                     pieces: parseInt(row.Total_Pieces) || 0,
                     cost: parseFloat(row.Total_Cost) || 0,
+                    poNumber: row.po_number || '',
                     issueDateStr,
-                    supervisor: row.Supervisor || '',
+                    supervisor: cleanStr(row.Supervisor),
                     placements,
                     gatePerson,
                     gateDate,
@@ -4125,7 +4168,7 @@ export function DoriDashboard({ onCompileNewPO }) {
             setPoList(parsedPOs);
         } catch (err) {
             console.error(err);
-            setError(err.message || 'Failed to load PO dashboard data');
+            setError(err.message || 'Failed to load Dori PO dashboard data');
         } finally {
             setLoading(false);
         }
@@ -4579,7 +4622,8 @@ export function DoriDashboard({ onCompileNewPO }) {
                             <tr>
                                 <th style={{ width: '40px', textAlign: 'center' }}>Sr. No.</th>
                                 <th>Lot No.</th>
-                                <th>Run Version</th>
+                                <th style={{ width: '60px', textAlign: 'center' }}>Ver.</th>
+                                <th>PO No.</th>
                                 <th>Garment Type</th>
                                 <th>Style</th>
                                 <th>Pieces</th>
@@ -4603,15 +4647,34 @@ export function DoriDashboard({ onCompileNewPO }) {
                             ) : (
                                 paginatedPOs.map((po, index) => {
                                     const serialNo = (currentPage - 1) * rowsPerPage + index + 1;
-                                    const verInfo = getLotVersionInfo(po.lotNumber);
+                                    const isMultiVersion = poList.filter(p => p.lotNumber === po.lotNumber).length > 1;
                                     return (
-                                        <tr key={po.lotNumber}>
+                                        <tr key={po.id || `${po.lotNumber}-v${po.version}`}>
                                             <td style={{ textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)' }}>{serialNo}</td>
-                                            <td style={{ fontWeight: '700', color: 'var(--warning)' }}>{verInfo.displayLot}</td>
-                                            <td>
-                                                <span className={`status-badge ${verInfo.isRecreated ? 'in-verification' : 'approved'}`} style={{ fontSize: '11px', padding: '3px 8px', textTransform: 'none' }}>
-                                                    {verInfo.versionText}
+                                            <td style={{ fontWeight: '700', color: 'var(--warning)' }}>{po.lotNumber}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <span style={{
+                                                    display: 'inline-block',
+                                                    padding: '2px 8px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '11px',
+                                                    fontWeight: '700',
+                                                    background: isMultiVersion
+                                                        ? (po.version === 1 ? 'rgba(217,119,6,0.1)' : 'rgba(16,185,129,0.1)')
+                                                        : 'rgba(100,116,139,0.1)',
+                                                    color: isMultiVersion
+                                                        ? (po.version === 1 ? '#d97706' : '#10b981')
+                                                        : '#64748b',
+                                                    border: `1px solid ${isMultiVersion ? (po.version === 1 ? 'rgba(217,119,6,0.3)' : 'rgba(16,185,129,0.3)') : 'rgba(100,116,139,0.2)'}`
+                                                }}>
+                                                    V{po.version}
                                                 </span>
+                                            </td>
+                                            <td>
+                                                {po.poNumber
+                                                    ? <span className="status-badge in-verification" style={{ fontSize: '11px', padding: '3px 8px', textTransform: 'none', letterSpacing: '0.5px' }}>{po.poNumber}</span>
+                                                    : <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>—</span>
+                                                }
                                             </td>
                                             <td style={{ fontWeight: '600' }}>
                                                 {po.garmentType}

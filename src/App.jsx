@@ -5,7 +5,7 @@ import {
   Layers, BarChart3, Settings as SettingsIcon, Sun, Moon,
   CheckCircle, AlertTriangle, Scissors,
   LogOut, X, ClipboardList, Shield, RotateCcw, ShieldCheck,
-  History, Bell, QrCode, Truck, Download
+  History, Bell, QrCode, Truck, Download, ChevronDown, ChevronRight, ArrowLeftRight, Menu
 } from 'lucide-react';
 import './App.css';
 
@@ -27,9 +27,21 @@ import PublicScanView from './components/PublicScanView';
 import ScannerLogsView from './components/ScannerLogsView';
 import FabricRgpForm from './components/rgp';
 import ReDownloadView from './components/ReDownloadView';
+import WeightCapture from './components/WeightCapture';
+import MaterialTransferView from './components/MaterialTransferView';
+import POVerificationView from './components/POVerificationView';
 
 // Default Mock Data Arrays
 const initialMaterials = [
+  { id: 'MT1008', name: 'COTTON', category: 'DYEING', stock: 1987, unit: 'Pcs', cost: 0, threshold: 50, color: 'hall 1 rack 2 (8 pkts), hall 2 rack 3 (2 pkts)', packets: 10 },
+  { id: 'MT1009', name: 'ZIP', category: 'DYEING', stock: 2097, unit: 'Pcs', cost: 0, threshold: 50, color: 'HALL 3 RACK 7', packets: 20 },
+  { id: 'MT1010', name: 'BUTTON', category: 'DYEING', stock: 1511, unit: 'Pcs', cost: 0, threshold: 50, color: 'HALL 3 RACK 4', packets: 5 },
+  { id: 'MT1011', name: 'fabric', category: 'Dyeing', stock: 223, unit: 'Pcs', cost: 0, threshold: 50, color: 'hall 3 rack 8', packets: 7 },
+  { id: 'MT1012', name: 'BUTTON', category: 'button', stock: 1511, unit: 'Pcs', cost: 0, threshold: 50, color: 'HALL 3 RACK 4', packets: 5 },
+  { id: 'MT1013', name: 'lastic', category: 'Zipper', stock: 223, unit: 'Pcs', cost: 0, threshold: 50, color: 'HALL 3 RACK 9', packets: 5 },
+  { id: 'MT1014', name: 'zip', category: 'zip', stock: 2225, unit: 'Pcs', cost: 0, threshold: 50, color: 'hall 4', packets: 10 },
+  { id: 'MT1015', name: 'lastic', category: 'lastic', stock: 223, unit: 'Pcs', cost: 0, threshold: 50, color: 'HALL 3 RACK 9', packets: 5 },
+  { id: 'MT1016', name: 'zip', category: 'zip', stock: 2285, unit: 'Pcs', cost: 0, threshold: 50, color: 'hall 5 rack 1', packets: 8 },
   { id: 'M1302', name: 'Organic Cotton Fabric Roll', category: 'Fabric', stock: 2400, unit: 'meters', cost: 25.00, threshold: 200, color: 'Pure White' },
   { id: 'M1303', name: 'Indigo Denim Raw Roll', category: 'Fabric', stock: 850, unit: 'meters', cost: 45.00, threshold: 150, color: 'Raw Deep Indigo' },
   { id: 'M1304', name: 'YKK Brass Zippers (15cm)', category: 'Trim', stock: 150, unit: 'pieces', cost: 2.50, threshold: 200, color: 'Matte Gold' },
@@ -187,22 +199,63 @@ const initialVendors = [
   { id: 'V103', name: 'Global Tags & Trims', email: 'info@globaltags.com', address: 'Apparel Center Complex, Mumbai', materialsJoined: 'Labels, Tags & Hangers' }
 ];
 
-export const getRolePanel = (role) => {
+const getRolePanel = (role) => {
   const r = (role || '').toLowerCase();
-  if (r === 'admin') return 'admin';
+  if (r === 'admin' || r === 'supply chain lead') return 'admin';
   if (r === 'designer' || r === 'lead designer' || r === 'pattern auditor') return 'designer';
   return 'store';
 };
 
-export { getBackendUrl };
-export const hasTabAccess = (tabName, role) => {
+const hasTabAccess = (tabName, role) => {
   const panel = getRolePanel(role);
-  if (panel === 'admin') return true;
+  if (panel === 'admin') {
+    return [
+      'dashboard',
+      'design',
+      'material_verification',
+      'rgp',
+      'zip_po',
+      'dori_po',
+      'generate_po',
+      'history',
+      'scanner_logs',
+      'weight_capture',
+      'material_issue',
+      'return_material',
+      'material_details',
+      'material_transfer',
+      'reports_history',
+      'settings',
+      'approval_queue',
+      'po_verification'
+    ].includes(tabName);
+  }
   if (panel === 'designer') {
-    return ['dashboard', 'design', 'material_verification', 'zip_po', 'approval_queue', 'rgp', 'generate_po', 're_download', 'history'].includes(tabName);
+    return [
+      'dashboard',
+      'design',
+      'material_verification',
+      'rgp',
+      'zip_po',
+      'dori_po',
+      'generate_po',
+      'history',
+      'scanner_logs',
+      'po_verification'
+    ].includes(tabName);
   }
   if (panel === 'store') {
-    return ['dashboard', 'material_issue', 'material_details', 'return_material', 'approval_queue', 'scanner_logs', 'rgp', 're_download', 'history'].includes(tabName);
+    return [
+      'dashboard',
+      'weight_capture',
+      'material_issue',
+      'return_material',
+      'material_details',
+      'material_transfer',
+      'history',
+      'scanner_logs',
+      'po_verification'
+    ].includes(tabName);
   }
   return false;
 };
@@ -211,6 +264,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isVerifyingToken, setIsVerifyingToken] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [designMenuOpen, setDesignMenuOpen] = useState(true);
+  const [adminDesignMenuOpen, setAdminDesignMenuOpen] = useState(true);
+  const [adminStoreMenuOpen, setAdminStoreMenuOpen] = useState(true);
   const [prefilledLotNo, setPrefilledLotNo] = useState('');
   const [prefilledPoType, setPrefilledPoType] = useState('zip');
   const [prefilledPoData, setPrefilledPoData] = useState(null);
@@ -254,7 +311,11 @@ export default function App() {
   const handleRedirectToZipPO = (lotNo, type = 'zip') => {
     setPrefilledLotNo(lotNo);
     setPrefilledPoType(type);
-    setActiveTab('zip_po');
+    if (type === 'dori') {
+      setActiveTab('dori_po');
+    } else {
+      setActiveTab('zip_po');
+    }
   };
   const handleRedirectToPO = (poData) => {
     setPrefilledPoData(poData);
@@ -364,20 +425,30 @@ export default function App() {
   useEffect(() => {
     const pageTitles = {
       dashboard: 'Dashboard',
-      design: 'Design',
+      design: 'Spec Sheet',
+      material_verification: 'Verification',
+      rgp: 'RGP',
+      zip_po: 'Zip PO',
+      dori_po: 'Dori PO',
+      generate_po: 'Generate PO',
+      history: 'Lot Workflow',
+      scanner_logs: 'Scanner Log',
+      weight_capture: 'Weight Capture',
       material_issue: 'Material Issue',
       return_material: 'Return Material',
-      generate_po: 'Generate PO',
-      zip_po: 'Zip PO',
-      material_details: 'Material Details',
-      reports_history: 'Reports & History',
-      settings: 'Settings',
-      approval_queue: currentUser?.role === 'Admin' ? 'Approval Queue' : 'My Requests',
-      rgp: 'Returnable Gate Pass (RGP)',
+      material_details: 'Material Detail',
+      material_transfer: 'Material Transfer',
+      reports_history: 'Report and History',
+      settings: 'Setting',
+      approval_queue: 'Approval Queue'
     };
     const title = pageTitles[activeTab] || 'MH Store';
     document.title = `Garment PDMS - ${title}`;
   }, [activeTab, currentUser]);
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [activeTab]);
 
   useEffect(() => {
     const handleAfterPrint = () => {
@@ -448,7 +519,7 @@ export default function App() {
     return () => clearInterval(pollInterval);
   }, []);
 
-  // Fetch materials from database on mount (replaces localStorage)
+  // Fetch materials from database on mount & poll every 3 seconds for live sync
   useEffect(() => {
     const fetchMaterials = async () => {
       try {
@@ -462,6 +533,9 @@ export default function App() {
       }
     };
     fetchMaterials();
+
+    const interval = setInterval(fetchMaterials, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch approval requests from database on mount
@@ -1391,7 +1465,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
       {/* Toast Notification */}
       {toast && (
         <div
@@ -1427,13 +1501,28 @@ export default function App() {
       )}
       {/* Sidebar Navigation */}
       <aside className="sidebar">
-        <div className="sidebar-logo">
-          <Layers3 size={28} style={{ color: 'var(--accent-color)' }} />
-          <span>MH STORE</span>
+        <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Layers3 size={28} style={{ color: 'var(--accent-color)' }} />
+            <span className="sidebar-logo-text">MH STORE</span>
+          </div>
+          <button 
+            className="mobile-sidebar-close" 
+            onClick={() => setIsSidebarOpen(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ffffff',
+              cursor: 'pointer'
+            }}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav style={{ flexGrow: 1 }}>
           <ul className="sidebar-menu">
+            {/* Dashboard */}
             {hasTabAccess('dashboard', currentUser?.role) && (
               <li
                 className={`sidebar-item ${activeTab === 'dashboard' ? 'active' : ''}`}
@@ -1444,142 +1533,195 @@ export default function App() {
               </li>
             )}
 
-            {hasTabAccess('design', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'design' ? 'active' : ''}`}
-                onClick={() => setActiveTab('design')}
-              >
-                <Scissors size={18} />
-                <span className="sidebar-text">Design</span>
-              </li>
+            {/* ADMIN DESIGN PANEL SUBMENU */}
+            {currentUser?.role === 'Admin' && (
+              <>
+                <li
+                  className={`sidebar-item ${['design', 'material_verification', 'rgp', 'zip_po', 'dori_po', 'generate_po', 'history', 'scanner_logs'].includes(activeTab) && activeTab !== 'history' ? 'active' : ''}`}
+                  onClick={() => setAdminDesignMenuOpen(!adminDesignMenuOpen)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Scissors size={18} />
+                    <span className="sidebar-text">Design Panel</span>
+                  </div>
+                  {adminDesignMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </li>
+                {adminDesignMenuOpen && (
+                  <ul className="sidebar-submenu">
+                    <li className={`sidebar-subitem ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>
+                      <span className="sidebar-text">Spec Sheet</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'material_verification' ? 'active' : ''}`} onClick={() => setActiveTab('material_verification')}>
+                      <span className="sidebar-text">Verification</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'rgp' ? 'active' : ''}`} onClick={() => setActiveTab('rgp')}>
+                      <span className="sidebar-text">RGP</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'zip_po' ? 'active' : ''}`} onClick={() => { setActiveTab('zip_po'); setPrefilledPoType('zip'); }}>
+                      <span className="sidebar-text">Zip PO</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'dori_po' ? 'active' : ''}`} onClick={() => { setActiveTab('dori_po'); setPrefilledPoType('dori'); }}>
+                      <span className="sidebar-text">Dori PO</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'generate_po' ? 'active' : ''}`} onClick={() => setActiveTab('generate_po')}>
+                      <span className="sidebar-text">Generate PO</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                      <span className="sidebar-text">Lot Workflow</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
+                      <span className="sidebar-text">Scanner Log</span>
+                    </li>
+                  </ul>
+                )}
+              </>
             )}
 
-
-
-            {hasTabAccess('material_verification', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'material_verification' ? 'active' : ''}`}
-                onClick={() => setActiveTab('material_verification')}
-              >
-                <ShieldCheck size={18} />
-                <span className="sidebar-text">Material Verification</span>
-              </li>
+            {/* ADMIN STORE PANEL SUBMENU */}
+            {currentUser?.role === 'Admin' && (
+              <>
+                <li
+                  className={`sidebar-item ${['weight_capture', 'material_issue', 'return_material', 'material_details', 'material_transfer', 'history', 'scanner_logs'].includes(activeTab) && activeTab !== 'history' ? 'active' : ''}`}
+                  onClick={() => setAdminStoreMenuOpen(!adminStoreMenuOpen)}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Layers size={18} />
+                    <span className="sidebar-text">Store Panel</span>
+                  </div>
+                  {adminStoreMenuOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                </li>
+                {adminStoreMenuOpen && (
+                  <ul className="sidebar-submenu">
+                    <li className={`sidebar-subitem ${activeTab === 'weight_capture' ? 'active' : ''}`} onClick={() => setActiveTab('weight_capture')}>
+                      <span className="sidebar-text">Weight Capture</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'material_issue' ? 'active' : ''}`} onClick={() => setActiveTab('material_issue')}>
+                      <span className="sidebar-text">Material Issue</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'return_material' ? 'active' : ''}`} onClick={() => setActiveTab('return_material')}>
+                      <span className="sidebar-text">Return Material</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'material_details' ? 'active' : ''}`} onClick={() => setActiveTab('material_details')}>
+                      <span className="sidebar-text">Material Detail</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'material_transfer' ? 'active' : ''}`} onClick={() => setActiveTab('material_transfer')}>
+                      <span className="sidebar-text">Material Transfer</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                      <span className="sidebar-text">Lot Workflow</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
+                      <span className="sidebar-text">Scanner Log</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'po_verification' ? 'active' : ''}`} onClick={() => setActiveTab('po_verification')}>
+                      <span className="sidebar-text">PO Verification</span>
+                    </li>
+                  </ul>
+                )}
+              </>
             )}
 
-            {hasTabAccess('material_issue', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'material_issue' ? 'active' : ''}`}
-                onClick={() => setActiveTab('material_issue')}
-              >
-                <ClipboardList size={18} />
-                <span className="sidebar-text">Material Issue</span>
-              </li>
+            {/* DESIGNER PANEL ITEMS (FLAT LIST) */}
+            {currentUser?.role !== 'Admin' && getRolePanel(currentUser?.role) === 'designer' && (
+              <>
+                <li className={`sidebar-item ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>
+                  <Scissors size={18} />
+                  <span className="sidebar-text">Spec Sheet</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'material_verification' ? 'active' : ''}`} onClick={() => setActiveTab('material_verification')}>
+                  <CheckSquare size={18} />
+                  <span className="sidebar-text">Verification</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'rgp' ? 'active' : ''}`} onClick={() => setActiveTab('rgp')}>
+                  <Truck size={18} />
+                  <span className="sidebar-text">RGP</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'zip_po' ? 'active' : ''}`} onClick={() => { setActiveTab('zip_po'); setPrefilledPoType('zip'); }}>
+                  <FileText size={18} />
+                  <span className="sidebar-text">Zip PO</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'dori_po' ? 'active' : ''}`} onClick={() => { setActiveTab('dori_po'); setPrefilledPoType('dori'); }}>
+                  <FileText size={18} />
+                  <span className="sidebar-text">Dori PO</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'generate_po' ? 'active' : ''}`} onClick={() => setActiveTab('generate_po')}>
+                  <FileText size={18} />
+                  <span className="sidebar-text">Generate PO</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                  <History size={18} />
+                  <span className="sidebar-text">Lot Workflow</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
+                  <QrCode size={18} />
+                  <span className="sidebar-text">Scanner Log</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'po_verification' ? 'active' : ''}`} onClick={() => setActiveTab('po_verification')}>
+                  <CheckCircle size={18} />
+                  <span className="sidebar-text">PO Verification</span>
+                </li>
+              </>
             )}
 
-            {hasTabAccess('return_material', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'return_material' ? 'active' : ''}`}
-                onClick={() => setActiveTab('return_material')}
-              >
-                <RotateCcw size={18} />
-                <span className="sidebar-text">Return Material</span>
-              </li>
+            {/* STORE ROOM PANEL ITEMS (FLAT LIST) */}
+            {currentUser?.role !== 'Admin' && getRolePanel(currentUser?.role) === 'store' && (
+              <>
+                <li className={`sidebar-item ${activeTab === 'weight_capture' ? 'active' : ''}`} onClick={() => setActiveTab('weight_capture')}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                  <span className="sidebar-text">Weight Capture</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'material_issue' ? 'active' : ''}`} onClick={() => setActiveTab('material_issue')}>
+                  <ClipboardList size={18} />
+                  <span className="sidebar-text">Material Issue</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'return_material' ? 'active' : ''}`} onClick={() => setActiveTab('return_material')}>
+                  <RotateCcw size={18} />
+                  <span className="sidebar-text">Return Material</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'material_details' ? 'active' : ''}`} onClick={() => setActiveTab('material_details')}>
+                  <Layers size={18} />
+                  <span className="sidebar-text">Material Detail</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'material_transfer' ? 'active' : ''}`} onClick={() => setActiveTab('material_transfer')}>
+                  <ArrowLeftRight size={18} />
+                  <span className="sidebar-text">Material Transfer</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                  <History size={18} />
+                  <span className="sidebar-text">Lot Workflow</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
+                  <QrCode size={18} />
+                  <span className="sidebar-text">Scanner Log</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'po_verification' ? 'active' : ''}`} onClick={() => setActiveTab('po_verification')}>
+                  <CheckCircle size={18} />
+                  <span className="sidebar-text">PO Verification</span>
+                </li>
+              </>
             )}
 
-            {hasTabAccess('rgp', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'rgp' ? 'active' : ''}`}
-                onClick={() => setActiveTab('rgp')}
-              >
-                <Truck size={18} />
-                <span className="sidebar-text">Returnable Gate Pass</span>
-              </li>
-            )}
-
-            {hasTabAccess('generate_po', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'generate_po' ? 'active' : ''}`}
-                onClick={() => setActiveTab('generate_po')}
-              >
-                <FileText size={18} />
-                <span className="sidebar-text">Generate PO</span>
-              </li>
-            )}
-
-            {hasTabAccess('re_download', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 're_download' ? 'active' : ''}`}
-                onClick={() => setActiveTab('re_download')}
-              >
-                <Download size={18} />
-                <span className="sidebar-text">Re-Download</span>
-              </li>
-            )}
-
-            {hasTabAccess('zip_po', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'zip_po' ? 'active' : ''}`}
-                onClick={() => setActiveTab('zip_po')}
-              >
-                <Scissors size={18} />
-                <span className="sidebar-text">Zip / Doori PO</span>
-              </li>
-            )}
-
-            {hasTabAccess('material_details', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'material_details' ? 'active' : ''}`}
-                onClick={() => setActiveTab('material_details')}
-              >
-                <Layers size={18} />
-                <span className="sidebar-text">Material Details</span>
-              </li>
-            )}
-
-            {hasTabAccess('reports_history', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'reports_history' ? 'active' : ''}`}
-                onClick={() => setActiveTab('reports_history')}
-              >
-                <BarChart3 size={18} />
-                <span className="sidebar-text">Reports & History</span>
-              </li>
-            )}
-
-            {hasTabAccess('history', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`}
-                onClick={() => setActiveTab('history')}
-              >
-                <History size={18} />
-                <span className="sidebar-text">Lot Workflow History</span>
-              </li>
-            )}
-
-            {/* Settings */}
-            {hasTabAccess('settings', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'settings' ? 'active' : ''}`}
-                onClick={() => setActiveTab('settings')}
-              >
-                <SettingsIcon size={18} />
-                <span className="sidebar-text">Settings</span>
-              </li>
-            )}
-
-            {/* Approval Queue / My Requests tab for all logged-in users */}
-            {hasTabAccess('approval_queue', currentUser?.role) && currentUser && (
-              <li
-                className={`sidebar-item ${activeTab === 'approval_queue' ? 'active' : ''}`}
-                onClick={() => setActiveTab('approval_queue')}
-                style={{ position: 'relative' }}
-              >
-                <Shield size={18} />
-                <span className="sidebar-text">
-                  {currentUser.role === 'Admin' ? 'Approval Queue' : 'My Requests'}
-                </span>
-                {currentUser.role === 'Admin' ? (
-                  approvalRequests.filter(r => r.status === 'pending').length > 0 && (
+            {/* ADMIN-SPECIFIC GLOBAL ITEMS */}
+            {currentUser?.role === 'Admin' && (
+              <>
+                <li className={`sidebar-item ${activeTab === 'reports_history' ? 'active' : ''}`} onClick={() => setActiveTab('reports_history')}>
+                  <BarChart3 size={18} />
+                  <span className="sidebar-text">Report and History</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                  <SettingsIcon size={18} />
+                  <span className="sidebar-text">Setting</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                  <History size={18} />
+                  <span className="sidebar-text">Lot Workflow</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'approval_queue' ? 'active' : ''}`} onClick={() => setActiveTab('approval_queue')} style={{ position: 'relative' }}>
+                  <Shield size={18} />
+                  <span className="sidebar-text">Approval Queue</span>
+                  {approvalRequests.filter(r => r.status === 'pending').length > 0 && (
                     <span style={{
                       position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
                       backgroundColor: 'var(--warning)', color: '#fff', fontSize: '10px',
@@ -1588,32 +1730,9 @@ export default function App() {
                     }}>
                       {approvalRequests.filter(r => r.status === 'pending').length}
                     </span>
-                  )
-                ) : (
-                  approvalRequests.filter(r => r.status === 'pending' && r.requesterName === currentUser.name).length > 0 && (
-                    <span style={{
-                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                      backgroundColor: 'var(--warning)', color: '#fff', fontSize: '10px',
-                      fontWeight: '800', padding: '2px 6px', borderRadius: '10px',
-                      lineHeight: 1
-                    }}>
-                      {approvalRequests.filter(r => r.status === 'pending' && r.requesterName === currentUser.name).length}
-                    </span>
-                  )
-                )}
-              </li>
-            )}
-
-            {/* History tab removed */}
-
-            {hasTabAccess('scanner_logs', currentUser?.role) && (
-              <li
-                className={`sidebar-item ${activeTab === 'scanner_logs' ? 'active' : ''}`}
-                onClick={() => setActiveTab('scanner_logs')}
-              >
-                <QrCode size={18} />
-                <span className="sidebar-text">Scanner Logs</span>
-              </li>
+                  )}
+                </li>
+              </>
             )}
           </ul>
         </nav>
@@ -1643,22 +1762,39 @@ export default function App() {
       <main className="main-content">
         {/* Top Header */}
         <header className="top-header">
+          <button 
+            className="mobile-menu-toggle"
+            onClick={() => setIsSidebarOpen(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-main)',
+              cursor: 'pointer',
+              marginRight: '12px'
+            }}
+          >
+            <Menu size={24} />
+          </button>
           <div className="header-title-container">
             <h1>
               {activeTab === 'dashboard' && 'Dashboard Overview'}
-              {activeTab === 'design' && 'Garment Specification Sheets (BOM)'}
-
-              {activeTab === 'material_issue' && 'Production Material Issue Center'}
-              {activeTab === 'generate_po' && 'Procure Fabric & Accessories'}
-              {activeTab === 're_download' && 'Documents Archive & Re-Download'}
-              {activeTab === 'zip_po' && 'Zip & Doori Purchase Order'}
-              {activeTab === 'material_details' && 'Inventory Control Center'}
-              {activeTab === 'reports_history' && 'Expenditure Analysis & Archive'}
-              {activeTab === 'settings' && 'System Preferences'}
-              {activeTab === 'approval_queue' && 'Admin Approval Queue'}
-              {activeTab === 'history' && 'Design Action Audit History'}
-              {activeTab === 'scanner_logs' && 'QR Scanner Database Logs'}
-              {activeTab === 'rgp' && 'Returnable Gate Pass (RGP)'}
+              {activeTab === 'design' && 'Spec Sheet'}
+              {activeTab === 'material_verification' && 'Verification'}
+              {activeTab === 'rgp' && 'RGP'}
+              {activeTab === 'zip_po' && 'Zip PO'}
+              {activeTab === 'dori_po' && 'Dori PO'}
+              {activeTab === 'generate_po' && 'Generate PO'}
+              {activeTab === 'history' && 'Lot Workflow'}
+              {activeTab === 'scanner_logs' && 'Scanner Log'}
+              {activeTab === 'weight_capture' && 'Weight Capture'}
+              {activeTab === 'material_issue' && 'Material Issue'}
+              {activeTab === 'return_material' && 'Return Material'}
+              {activeTab === 'material_details' && 'Material Detail'}
+              {activeTab === 'material_transfer' && 'Material Transfer'}
+              {activeTab === 'reports_history' && 'Report and History'}
+              {activeTab === 'settings' && 'Setting'}
+              {activeTab === 'approval_queue' && 'Approval Queue'}
+              {activeTab === 'po_verification' && 'PO Verification'}
             </h1>
           </div>
 
@@ -1887,6 +2023,7 @@ export default function App() {
               currencySymbol={currencySymbol}
               prefilledPoData={prefilledPoData}
               setPrefilledPoData={setPrefilledPoData}
+              materials={materials}
             />
           )}
 
@@ -1898,7 +2035,11 @@ export default function App() {
           )}
 
           {activeTab === 'zip_po' && (
-            <PuneetZip prefilledLotNo={prefilledLotNo} setPrefilledLotNo={setPrefilledLotNo} initialTab={prefilledPoType || 'zip'} />
+            <PuneetZip prefilledLotNo={prefilledLotNo} setPrefilledLotNo={setPrefilledLotNo} initialTab="zip" />
+          )}
+
+          {activeTab === 'dori_po' && (
+            <PuneetZip prefilledLotNo={prefilledLotNo} setPrefilledLotNo={setPrefilledLotNo} initialTab="dori" />
           )}
 
           {activeTab === 'material_details' && (
@@ -1906,6 +2047,7 @@ export default function App() {
               materials={materials}
               onAddMaterial={handleAddMaterial}
               onDeleteMaterial={handleDeleteMaterial}
+              onUpdateMaterial={handleUpdateMaterial}
               currencySymbol={currencySymbol}
               currentUser={currentUser}
               onSubmitApproval={handleSubmitApprovalRequest}
@@ -1976,6 +2118,18 @@ export default function App() {
               setPrefilledRgpData={setPrefilledRgpData}
               currentUser={currentUser}
             />
+          )}
+
+          {activeTab === 'weight_capture' && currentUser && (
+            <WeightCapture />
+          )}
+
+          {activeTab === 'material_transfer' && currentUser && (
+            <MaterialTransferView currentUser={currentUser} />
+          )}
+
+          {activeTab === 'po_verification' && (
+            <POVerificationView currencySymbol={currencySymbol} currentUser={currentUser} />
           )}
         </div>
       </main>

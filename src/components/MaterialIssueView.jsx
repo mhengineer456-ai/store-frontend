@@ -1,8 +1,261 @@
 import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect, useRef } from 'react';
-import { ClipboardList, AlertTriangle, CheckCircle, ArrowRight, Layers, HelpCircle, Printer, Trash2, Plus, RotateCcw, X, PrinterCheck, Shield, Send } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckCircle, ArrowRight, Layers, HelpCircle, Printer, Trash2, Plus, RotateCcw, X, PrinterCheck, Shield, Send, ChevronDown, Search } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
+
+function SearchableMaterialSelect({ materials = [], value, onChange, disabled = false, placeholder = "-- Select Material --", hasError = false }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const containerRef = useRef(null);
+
+  const selectedMaterial = materials.find(m => String(m.id) === String(value));
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+        setSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = materials.filter(m => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return true;
+    const codeStr = String(m.id || '').toLowerCase();
+    const nameStr = String(m.name || '').toLowerCase();
+    const colorStr = String(m.color || '').toLowerCase();
+    const catStr = String(m.category || '').toLowerCase();
+    return codeStr.includes(q) || nameStr.includes(q) || colorStr.includes(q) || catStr.includes(q);
+  });
+
+  return (
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', zIndex: isOpen ? 99999 : 1 }}>
+      <div 
+        onClick={() => {
+          if (disabled) return;
+          setIsOpen(!isOpen);
+          if (!isOpen) setSearchQuery('');
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          width: '100%',
+          height: '34px',
+          padding: '4px 10px',
+          borderRadius: '6px',
+          border: '1px solid',
+          borderColor: hasError ? 'var(--danger)' : isOpen ? '#6366f1' : 'var(--border-color)',
+          background: disabled ? 'var(--bg-secondary, #f1f5f9)' : 'var(--bg-primary, #ffffff)',
+          color: selectedMaterial ? 'var(--text-main, #0f172a)' : 'var(--text-muted, #64748b)',
+          fontSize: '12px',
+          fontWeight: '500',
+          opacity: disabled ? 0.6 : 1,
+          boxShadow: isOpen ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ 
+          whiteSpace: 'nowrap', 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis',
+          paddingRight: '6px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}>
+          {selectedMaterial ? (
+            <>
+              <span style={{
+                fontFamily: 'monospace',
+                fontWeight: '800',
+                fontSize: '11px',
+                backgroundColor: 'rgba(99,102,241,0.12)',
+                color: '#4f46e5',
+                padding: '1px 5px',
+                borderRadius: '4px',
+                flexShrink: 0
+              }}>
+                [{selectedMaterial.id}]
+              </span>
+              <span style={{ fontWeight: '600' }}>
+                {selectedMaterial.name}
+              </span>
+              {selectedMaterial.color && selectedMaterial.color !== 'Default' && (
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  ({selectedMaterial.color})
+                </span>
+              )}
+              {selectedMaterial.stock !== undefined && (
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>
+                  • {selectedMaterial.stock} {selectedMaterial.unit || 'Pcs'}
+                </span>
+              )}
+            </>
+          ) : (
+            placeholder
+          )}
+        </span>
+        <ChevronDown size={14} style={{ 
+          color: 'var(--text-muted)',
+          transform: isOpen ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.2s ease',
+          flexShrink: 0
+        }} />
+      </div>
+
+      {isOpen && !disabled && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          width: 'max-content',
+          minWidth: '100%',
+          maxWidth: '360px',
+          border: '1.5px solid var(--border-color, #cbd5e1)',
+          borderRadius: '8px',
+          boxShadow: '0 12px 30px rgba(0, 0, 0, 0.22), 0 4px 10px rgba(0, 0, 0, 0.08)',
+          backgroundColor: 'var(--bg-primary, #ffffff)',
+          color: 'var(--text-main, #0f172a)',
+          zIndex: 999999,
+          padding: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <Search size={14} style={{
+              position: 'absolute',
+              left: '10px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: '#64748b'
+            }} />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Search MT Code, Name, Location..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                height: '32px',
+                padding: '4px 8px 4px 30px',
+                fontSize: '12px',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                outline: 'none',
+                background: '#f8fafc',
+                color: '#0f172a',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{
+            maxHeight: '220px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2px'
+          }}>
+            <div
+              onClick={() => {
+                onChange('');
+                setIsOpen(false);
+                setSearchQuery('');
+              }}
+              style={{
+                padding: '6px 10px',
+                fontSize: '11.5px',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                color: '#64748b',
+                fontStyle: 'italic',
+                backgroundColor: value === '' ? 'rgba(99,102,241,0.1)' : 'transparent'
+              }}
+            >
+              -- Clear / Select Material --
+            </div>
+
+            {filtered.length === 0 ? (
+              <div style={{ padding: '8px 10px', fontSize: '11.5px', color: '#94a3b8', textAlign: 'center' }}>
+                No materials found
+              </div>
+            ) : (
+              filtered.map(m => {
+                const isSelected = String(m.id) === String(value);
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      onChange(m.id);
+                      setIsOpen(false);
+                      setSearchQuery('');
+                    }}
+                    style={{
+                      padding: '7px 10px',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                      borderRadius: '5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: isSelected ? '#6366f1' : 'transparent',
+                      color: isSelected ? '#ffffff' : 'var(--text-main, #0f172a)',
+                      fontWeight: isSelected ? '700' : '400',
+                      transition: 'background-color 0.15s ease',
+                      gap: '8px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = 'var(--bg-secondary, #f1f5f9)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
+                      <span style={{
+                        fontFamily: 'monospace',
+                        fontWeight: '800',
+                        fontSize: '11px',
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : 'rgba(99,102,241,0.12)',
+                        color: isSelected ? '#ffffff' : '#4f46e5',
+                        padding: '1px 5px',
+                        borderRadius: '4px',
+                        flexShrink: 0
+                      }}>
+                        {m.id}
+                      </span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.name}</span>
+                      {m.color && m.color !== 'Default' && (
+                        <span style={{ fontSize: '11px', opacity: 0.8, flexShrink: 0 }}>
+                          ({m.color})
+                        </span>
+                      )}
+                    </div>
+                    {m.stock !== undefined && (
+                      <span style={{ fontSize: '11px', opacity: 0.85, fontWeight: '700', flexShrink: 0 }}>
+                        {m.stock} {m.unit || 'Pcs'}
+                      </span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MaterialIssueView({
   designs = [],
@@ -1090,7 +1343,7 @@ export default function MaterialIssueView({
                 </div>
               </div>
 
-              <div className="custom-table-container">
+              <div className="custom-table-container" style={{ overflow: 'visible' }}>
                 <table className="custom-table" style={{ fontSize: '13px' }}>
                   <thead>
                     <tr>
@@ -1110,8 +1363,8 @@ export default function MaterialIssueView({
                           title="Select / Deselect All Components"
                         />
                       </th>
-                      <th>BOM Component</th>
-                      <th>Inventory Item Map</th>
+                      <th style={{ width: '160px' }}>BOM Component</th>
+                      <th style={{ minWidth: '280px' }}>Inventory Item Map</th>
 
                       <th>Description</th>
                       <th style={{ textAlign: 'center' }}>Total Needed</th>
@@ -1160,26 +1413,13 @@ export default function MaterialIssueView({
                             </div>
                           </td>
                           <td>
-                            <select
-                              className="form-input"
-                              style={{
-                                height: '30px',
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                border: '1px solid',
-                                borderColor: (!item.materialId && item.issued && !item.alreadyIssued) ? 'var(--danger)' : 'var(--border-color)'
-                              }}
+                            <SearchableMaterialSelect
+                              materials={materials}
                               value={item.materialId}
-                              onChange={(e) => handleMappingChange(idx, 'materialId', e.target.value)}
+                              onChange={(val) => handleMappingChange(idx, 'materialId', val)}
                               disabled={!item.issued || item.alreadyIssued}
-                            >
-                              <option value="">-- Select Material --</option>
-                              {materials.map(m => (
-                                <option key={m.id} value={m.id}>
-                                  {m.name} {m.color && m.color !== 'Default' && `(${m.color})`}
-                                </option>
-                              ))}
-                            </select>
+                              hasError={!item.materialId && item.issued && !item.alreadyIssued}
+                            />
                           </td>
 
                           <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
@@ -1960,19 +2200,11 @@ export default function MaterialIssueView({
                           </div>
                         )}
                         <div>
-                          <select
-                            className="form-input"
+                          <SearchableMaterialSelect
+                            materials={materials}
                             value={item.materialId}
-                            onChange={(e) => handleReturnItemChange(index, 'materialId', e.target.value)}
-                            required
-                          >
-                            <option value="">-- Select Material --</option>
-                            {materials.map(m => (
-                              <option key={m.id} value={m.id}>
-                                {m.name} {m.color && m.color !== 'Default' ? `(${m.color})` : ''} ({m.stock} {m.unit} in stock)
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(val) => handleReturnItemChange(index, 'materialId', val)}
+                          />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <input

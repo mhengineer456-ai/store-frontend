@@ -264,7 +264,7 @@ body {
 
 /* Page Wrapper */
 .page-container {
-  padding: 32px;
+  padding: 16px;
   flex-grow: 1;
   max-width: 1600px;
   width: 100%;
@@ -1664,5 +1664,163 @@ body.dark-theme .custom-dropdown-menu {
     border-top: 2px dashed #000000 !important;
     margin-top: 40px !important;
     padding-top: 40px !important;
+  }
+}
+
+/* Sidebar Submenu Styles */
+.sidebar-submenu {
+  list-style: none;
+  padding-left: 20px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-subitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  text-decoration: none;
+  color: var(--sidebar-text);
+  transition: all 0.2s ease;
+}
+
+.sidebar-subitem:hover {
+  background-color: var(--sidebar-hover);
+  color: #ffffff;
+}
+
+.sidebar-subitem.active {
+  background-color: var(--sidebar-active);
+  color: var(--sidebar-text-active);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Device Compatibility & Responsive Media Queries ──────────────────────── */
+
+/* Hide mobile-specific toggle buttons by default on desktops/laptops */
+.mobile-menu-toggle {
+  display: none !important;
+}
+.mobile-sidebar-close {
+  display: none !important;
+}
+
+/* Tablet Layout Constraints */
+@media (max-width: 1024px) {
+  .app-container {
+    grid-template-columns: 80px 1fr !important;
+  }
+  .sidebar-text, .sidebar-logo-text {
+    display: none !important;
+  }
+  .mobile-menu-toggle {
+    display: none !important;
+  }
+}
+
+/* Mobile & Portrait Tablet Layout Constraints */
+@media (max-width: 768px) {
+  .app-container {
+    grid-template-columns: 1fr !important;
+    position: relative;
+  }
+
+  /* Show Hamburger Menu Toggle button */
+  .mobile-menu-toggle {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-main) !important;
+  }
+
+  /* Show Mobile Sidebar Close button */
+  .mobile-sidebar-close {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    transition: background 0.2s;
+  }
+  .mobile-sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Transition Sidebar into a drawer layout */
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    bottom: 0;
+    left: -280px;
+    width: 280px;
+    height: 100vh;
+    z-index: 1000 !important;
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(0);
+    border-right: 1px solid var(--border-color);
+  }
+
+  /* Trigger open state */
+  .app-container.sidebar-open .sidebar {
+    transform: translateX(280px);
+  }
+
+  /* Display text again inside mobile drawer */
+  .sidebar-text, .sidebar-logo-text {
+    display: inline !important;
+  }
+
+  /* Adjust Page Header */
+  .top-header {
+    padding: 16px !important;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .top-header h1 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Adjust Main Panels, Forms and Grids to stack vertically */
+  .po-grid-2, .grid-3, .dashboard-grid, .weight-capture-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .panel {
+    padding: 16px !important;
+  }
+
+  .custom-table-container {
+    overflow-x: auto !important;
+  }
+
+  /* Styling details cards to fit small screens */
+  .spec-list {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .spec-item {
+    grid-column: span 1 !important;
+  }
+
+  /* Adjust print views hide */
+  .screen-only-element {
+    width: 100% !important;
   }
 }

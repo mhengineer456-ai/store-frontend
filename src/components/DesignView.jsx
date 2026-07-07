@@ -1253,7 +1253,7 @@ export default function DesignView({
                         fontFamily: 'var(--font-family-title)',
                         letterSpacing: '0.04em'
                       }}>
-                        #{getLotVersionInfo(design.id).displayLot}
+                        #{getLotVersionInfo(design.id, designs).displayLot}
                       </div>
                       <span
                         className={`status-badge ${design.status.toLowerCase().replace(/\s+/g, '-')}`}
@@ -1267,23 +1267,8 @@ export default function DesignView({
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: '600', fontFamily: 'monospace' }}>LOT</span>
-                            <span style={{ fontWeight: 'bold' }}>{getLotVersionInfo(design.id).displayLot}</span>
+                            <span style={{ fontWeight: 'bold' }}>{getLotVersionInfo(design.id, designs).displayLot}</span>
                           </div>
-                          {getLotVersionInfo(design.id).isRecreated && (
-                            <span style={{
-                              fontSize: '9px',
-                              backgroundColor: 'var(--warning)',
-                              color: '#fff',
-                              padding: '1px 5px',
-                              borderRadius: '3px',
-                              fontWeight: '700',
-                              marginTop: '3px',
-                              textTransform: 'none',
-                              display: 'inline-block'
-                            }}>
-                              {getLotVersionInfo(design.id).versionText}
-                            </span>
-                          )}
                         </div>
                         {design.style && (
                           <span
@@ -1453,14 +1438,32 @@ export default function DesignView({
 
                 {/* Garment Details Grid */}
                 <div className="spec-list">
-                  <div className="spec-item" style={{ backgroundColor: 'var(--accent-light)', borderRadius: '6px', padding: '8px 12px', border: '1px solid var(--accent-color)', gridColumn: 'span 2' }}>
-                    <span className="spec-label" style={{ color: 'var(--accent-color)', fontWeight: '700' }}>Lot Number</span>
-                    <span className="spec-value" style={{ color: 'var(--accent-color)', fontSize: '16px', fontWeight: '800', fontFamily: 'var(--font-family-title)' }}>{selectedDesign.id}</span>
+                  <div className="spec-item" style={{ backgroundColor: 'var(--accent-light)', borderRadius: '6px', padding: '8px 12px', border: '1px solid var(--accent-color)', gridColumn: 'span 2', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <span className="spec-label" style={{ color: 'var(--accent-color)', fontWeight: '700' }}>Lot Number</span>
+                      <span className="spec-value" style={{ color: 'var(--accent-color)', fontSize: '16px', fontWeight: '800', fontFamily: 'var(--font-family-title)' }}>{selectedDesign.id}</span>
+                    </div>
+                    {selectedDesign.repeat_against && (
+                      <span className="status-badge in-verification" style={{ fontSize: '10px', padding: '4px 8px', textTransform: 'none', fontWeight: 'bold', display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                        🔁 Repeat against #{selectedDesign.repeat_against}
+                      </span>
+                    )}
                   </div>
                   {selectedDesign.lotNo2 && selectedDesign.lotNo2 !== 'N/A' && (
                     <div className="spec-item">
                       <span className="spec-label">Secondary Lot No</span>
                       <span className="spec-value" style={{ fontWeight: 'bold' }}>{selectedDesign.lotNo2}</span>
+                    </div>
+                  )}
+                  {selectedDesign.repeat_against && (
+                    <div className="spec-item" style={{ gridColumn: 'span 2', background: 'linear-gradient(90deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))', borderRadius: '10px', border: '1.5px solid rgba(245,158,11,0.4)', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span className="spec-label" style={{ color: '#b45309', fontWeight: '800', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        🔄 REPEAT LOT
+                      </span>
+                      <span className="spec-value" style={{ fontWeight: '900', color: '#b45309', fontSize: '16px', letterSpacing: '1px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '600', color: '#92400e', background: 'rgba(245,158,11,0.15)', borderRadius: '4px', padding: '1px 6px' }}>Repeat Against</span>
+                        Lot #{selectedDesign.repeat_against}
+                      </span>
                     </div>
                   )}
                   {selectedDesign.brand && (
@@ -1612,7 +1615,16 @@ export default function DesignView({
               <div className="print-layout-container print-only-element">
                 <div className="print-header">
                   <h2>Fashion Customization</h2>
-                  <div className="lot-badge">LOT NO: {selectedDesign.id}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <div className="lot-badge">LOT NO: {selectedDesign.id}</div>
+                    {selectedDesign.repeat_against && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'linear-gradient(90deg, #fef3c7, #fde68a)', border: '1.5px solid #f59e0b', borderRadius: '6px', padding: '4px 12px' }}>
+                        <span style={{ fontSize: '13px' }}>🔄</span>
+                        <span style={{ fontWeight: '900', fontSize: '10px', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Repeat Against Lot</span>
+                        <span style={{ fontWeight: '900', fontSize: '14px', color: '#b45309', letterSpacing: '1px' }}>#{selectedDesign.repeat_against}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="print-columns">
@@ -1664,6 +1676,7 @@ export default function DesignView({
                       <span className="print-detail-label">Secondary Lot</span>
                       <span className="print-detail-value">{selectedDesign.lotNo2 || '—'}</span>
                     </div>
+
                     <div className="print-detail-item">
                       <span className="print-detail-label">Brand</span>
                       <span className="print-detail-value">{selectedDesign.brand || '—'}</span>
@@ -1764,8 +1777,16 @@ export default function DesignView({
   );
 }
 
-const getLotVersionInfo = (lotNo) => {
+const getLotVersionInfo = (lotNo, designs = []) => {
   const lotStr = String(lotNo || '').trim();
+  const d = designs.find(des => String(des.id).toLowerCase() === lotStr.toLowerCase());
+  if (d && d.repeat_against) {
+    return {
+      displayLot: lotStr,
+      versionText: `Repeat against Lot #${d.repeat_against}`,
+      isRecreated: true
+    };
+  }
   if (lotStr.includes('-V')) {
     const parts = lotStr.split('-V');
     return {
@@ -1776,7 +1797,7 @@ const getLotVersionInfo = (lotNo) => {
   }
   return {
     displayLot: lotStr,
-    versionText: 'Original (Run 1)',
+    versionText: 'Original Lot',
     isRecreated: false
   };
 };

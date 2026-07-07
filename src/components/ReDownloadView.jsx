@@ -1,7 +1,7 @@
 import { getBackendUrl } from '../utils/api';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Download, Search, FileText, Truck, Calendar, User, 
+  Download, Search, FileText, Truck, Calendar, User,
   ChevronRight, RefreshCw, AlertCircle, Scissors, Layers, Tag
 } from 'lucide-react';
 import { generatePurchaseOrderPDF, downloadPdfBlob, toDataURL_QR, buildPoQrUrls } from './GeneratePOView';
@@ -29,7 +29,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
   const [doriPoList, setDoriPoList] = useState([]);
   const [rgpList, setRgpList] = useState([]);
   const [zipQualityData, setZipQualityData] = useState([]);
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,7 +72,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
     setError('');
     try {
       const hostname = window.location.hostname;
-      
+
       // 1. Fetch Standard POs
       const poRes = await fetch(`${getBackendUrl()}/api/pos`);
       if (poRes.ok) {
@@ -131,7 +131,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
             };
           })
           .filter(Boolean);
-        
+
         rgps.sort((a, b) => (b.rgpNo || '').localeCompare(a.rgpNo || ''));
         setRgpList(rgps);
       }
@@ -156,7 +156,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
   const filteredPOs = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return poList;
-    return poList.filter(po => 
+    return poList.filter(po =>
       (po.poNumber || '').toLowerCase().includes(q) ||
       (po.vendorName || '').toLowerCase().includes(q) ||
       (po.designName || '').toLowerCase().includes(q)
@@ -166,7 +166,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
   const filteredZipPOs = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return zipPoList;
-    return zipPoList.filter(po => 
+    return zipPoList.filter(po =>
       (po.Lot_Number || '').toLowerCase().includes(q) ||
       (po.Supervisor || '').toLowerCase().includes(q) ||
       (po.Style || '').toLowerCase().includes(q) ||
@@ -177,7 +177,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
   const filteredDoriPOs = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return doriPoList;
-    return doriPoList.filter(po => 
+    return doriPoList.filter(po =>
       (po.Lot_Number || '').toLowerCase().includes(q) ||
       (po.Supervisor || '').toLowerCase().includes(q) ||
       (po.Style || '').toLowerCase().includes(q) ||
@@ -188,7 +188,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
   const filteredRGPs = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return rgpList;
-    return rgpList.filter(rgp => 
+    return rgpList.filter(rgp =>
       (rgp.rgpNo || '').toLowerCase().includes(q) ||
       (rgp.vendor || '').toLowerCase().includes(q) ||
       (rgp.rgpType || '').toLowerCase().includes(q) ||
@@ -268,11 +268,11 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
         const payload = typeof po.zip_payload === 'string' ? JSON.parse(po.zip_payload) : po.zip_payload;
         selections = payload.zipSelections || {};
       }
-    } catch (_) {}
+    } catch (_) { }
 
     const rows = [];
     let grandTotal = 0;
-    
+
     // Attempt 1: Parse po.Color_Breakdown
     if (po.Color_Breakdown) {
       const parts = po.Color_Breakdown.split(';');
@@ -296,7 +296,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       const shadesList = po.Shades.split(',').map(s => s.trim()).filter(Boolean);
       const totalQty = po.Cutting_Qty || po.Total_Pieces || 0;
       const pcsPerShade = shadesList.length > 0 ? Math.round(totalQty / shadesList.length) : 0;
-      
+
       shadesList.forEach(shade => {
         rows.push({
           color: shade,
@@ -312,7 +312,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       const keys = Object.keys(selections);
       const totalQty = po.Total_Pieces || po.Cutting_Qty || 0;
       const pcsPerColor = keys.length > 0 ? Math.round(totalQty / keys.length) : 0;
-      
+
       keys.forEach(colorName => {
         rows.push({
           color: colorName,
@@ -371,11 +371,11 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
     setDownloadingId(po.poNumber);
     try {
       const hostname = window.location.hostname;
-      const isLocalHostOrIP = 
-        hostname === 'localhost' || 
-        hostname === '127.0.0.1' || 
-        hostname.startsWith('192.168.') || 
-        hostname.startsWith('10.') || 
+      const isLocalHostOrIP =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.') ||
         hostname.startsWith('172.');
 
       let localSystemUrl = `${window.location.origin}/`;
@@ -551,11 +551,11 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
         matrix.rows.forEach(r => {
           zipSelections[r.color] = r.color.toLowerCase() === 'black' ? 'Black' : 'Coloured';
         });
-        
+
         let placements = ['DEFAULT'];
         try {
           if (po.Selected_Placements) placements = JSON.parse(po.Selected_Placements);
-        } catch (_) {}
+        } catch (_) { }
 
         options = {
           issueDate: po.Issue_Date || po.Timestamp || new Date().toLocaleDateString('en-GB'),
@@ -583,11 +583,11 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
     setDownloadingId(rgp.rgpNo);
     try {
       const hostname = window.location.hostname;
-      const isLocalHostOrIP = 
-        hostname === 'localhost' || 
-        hostname === '127.0.0.1' || 
-        hostname.startsWith('192.168.') || 
-        hostname.startsWith('10.') || 
+      const isLocalHostOrIP =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname.startsWith('192.168.') ||
+        hostname.startsWith('10.') ||
         hostname.startsWith('172.');
 
       let localSystemUrl = `${window.location.origin}/`;
@@ -605,19 +605,19 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
         const port = window.location.port ? `:${window.location.port}` : '';
         localSystemUrl = `http://${serverIp}${port}/`;
       }
-      
+
       const entryUrl = `${localSystemUrl}?action=rgpEntryForm&rgp=${encodeURIComponent(rgp.rgpNo)}`;
       const returnUrl = `${localSystemUrl}?action=rgpReturnForm&rgp=${encodeURIComponent(rgp.rgpNo)}`;
-      
+
       let entryQR, returnQR;
       try { entryQR = await generateQRCode(entryUrl); } catch (qrError) { console.error("Failed to generate entry QR:", qrError); }
       try { returnQR = await generateQRCode(returnUrl); } catch (qrError) { console.error("Failed to generate return QR:", qrError); }
 
-      const pdfDoc = generateRgpPDF({ 
-        payload: rgp, 
-        options: { qrEntryImage: entryQR, qrReturnImage: returnQR } 
+      const pdfDoc = generateRgpPDF({
+        payload: rgp,
+        options: { qrEntryImage: entryQR, qrReturnImage: returnQR }
       });
-      
+
       pdfDoc.save(`RGP-${rgp.rgpNo}.pdf`);
     } catch (err) {
       console.error("RGP PDF compile error:", err);
@@ -718,7 +718,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       {/* Main Split Layout */}
       {!loading && !error && (
         <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '24px', alignItems: 'start' }}>
-          
+
           {/* LEFT COLUMN: Search & List Panel */}
           <div className="panel" style={{ padding: '20px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.01)' }}>
             <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -727,9 +727,9 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                 type="text"
                 placeholder={
                   activeSubTab === 'po' ? "Search PO No, Vendor or design..." :
-                  activeSubTab === 'zip' ? "Search Lot No, Supervisor or style..." :
-                  activeSubTab === 'dori' ? "Search Lot No, Supervisor or style..." :
-                  "Search RGP No, Vendor or type..."
+                    activeSubTab === 'zip' ? "Search Lot No, Supervisor or style..." :
+                      activeSubTab === 'dori' ? "Search Lot No, Supervisor or style..." :
+                        "Search RGP No, Vendor or type..."
                 }
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -893,29 +893,29 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
           <div className="panel" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 4px 20px rgba(0,0,0,0.01)', minHeight: '500px' }}>
             {selectedDoc ? (
               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-                
+
                 {/* Upper Metadata area */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', marginBottom: '20px' }}>
                     <div>
                       <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)' }}>
                         {activeSubTab === 'po' ? selectedDoc.poNumber :
-                         activeSubTab === 'zip' || activeSubTab === 'dori' ? `Lot: ${selectedDoc.Lot_Number}` :
-                         selectedDoc.rgpNo}
+                          activeSubTab === 'zip' || activeSubTab === 'dori' ? `Lot: ${selectedDoc.Lot_Number}` :
+                            selectedDoc.rgpNo}
                       </h3>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Calendar size={14} />
                           {activeSubTab === 'po' ? selectedDoc.date :
-                           activeSubTab === 'zip' ? (selectedDoc.Date_of_Issue || selectedDoc.Saved_At) :
-                           activeSubTab === 'dori' ? (selectedDoc.Issue_Date || selectedDoc.Timestamp) :
-                           selectedDoc.date}
+                            activeSubTab === 'zip' ? (selectedDoc.Date_of_Issue || selectedDoc.Saved_At) :
+                              activeSubTab === 'dori' ? (selectedDoc.Issue_Date || selectedDoc.Timestamp) :
+                                selectedDoc.date}
                         </span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <User size={14} />
                           Supervisor: {activeSubTab === 'po' ? (selectedDoc.approvedBy || selectedDoc.preparedBy || 'N/A') :
-                                       activeSubTab === 'zip' || activeSubTab === 'dori' ? (selectedDoc.Supervisor || 'N/A') :
-                                       (selectedDoc.preparedBy || 'N/A')}
+                            activeSubTab === 'zip' || activeSubTab === 'dori' ? (selectedDoc.Supervisor || 'N/A') :
+                              (selectedDoc.preparedBy || 'N/A')}
                         </span>
                       </div>
                     </div>
@@ -930,7 +930,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                       border: '1.5px solid var(--success, #10b981)'
                     }}>
                       {activeSubTab === 'po' ? (selectedDoc.status || 'Issued') :
-                       activeSubTab === 'zip' || activeSubTab === 'dori' ? 'Approved' : 'Outward'}
+                        activeSubTab === 'zip' || activeSubTab === 'dori' ? 'Approved' : 'Outward'}
                     </div>
                   </div>
 
@@ -940,8 +940,8 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>Article Style</div>
                       <div style={{ fontSize: '14px', fontWeight: '700', marginTop: '4px', color: 'var(--text-main)' }}>
                         {activeSubTab === 'po' ? selectedDoc.designName :
-                         activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Style :
-                         selectedDoc.purpose}
+                          activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Style :
+                            selectedDoc.purpose}
                       </div>
                     </div>
                     <div style={{ padding: '14px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
@@ -950,18 +950,18 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                       </div>
                       <div style={{ fontSize: '14px', fontWeight: '700', marginTop: '4px', color: 'var(--text-main)', textTransform: 'uppercase' }}>
                         {activeSubTab === 'po' ? selectedDoc.designCategory :
-                         activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Garment_Type :
-                         selectedDoc.rgpType}
+                          activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Garment_Type :
+                            selectedDoc.rgpType}
                       </div>
                     </div>
                     <div style={{ padding: '14px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>
                         {activeSubTab === 'po' ? 'Grand Total' :
-                         activeSubTab === 'zip' ? 'Cutting Qty' :
-                         activeSubTab === 'dori' ? 'Total Pieces' : 'Items Count'}
+                          activeSubTab === 'zip' ? 'Cutting Qty' :
+                            activeSubTab === 'dori' ? 'Total Pieces' : 'Items Count'}
                       </div>
                       <div style={{ fontSize: '14px', fontWeight: '700', marginTop: '4px', color: 'var(--text-main)' }}>
-                        {activeSubTab === 'po' && `${currencySymbol} ${selectedDoc.total ? selectedDoc.total.toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00'}`}
+                        {activeSubTab === 'po' && `${currencySymbol} ${selectedDoc.total ? selectedDoc.total.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '0.00'}`}
                         {activeSubTab === 'zip' && `${selectedDoc.Cutting_Qty || selectedDoc.Stitching_Issue_Qty || 0} Pcs`}
                         {activeSubTab === 'dori' && `${selectedDoc.Total_Pieces || 0} Pcs`}
                         {activeSubTab === 'rgp' && `${Array.isArray(selectedDoc.entries) ? selectedDoc.entries.length : 1} Line(s)`}
@@ -1100,8 +1100,8 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                   }}
                   disabled={downloadingId === (
                     activeSubTab === 'po' ? selectedDoc.poNumber :
-                    activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Lot_Number :
-                    selectedDoc.rgpNo
+                      activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Lot_Number :
+                        selectedDoc.rgpNo
                   )}
                   style={{
                     width: '100%',
@@ -1118,8 +1118,8 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                 >
                   {downloadingId === (
                     activeSubTab === 'po' ? selectedDoc.poNumber :
-                    activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Lot_Number :
-                    selectedDoc.rgpNo
+                      activeSubTab === 'zip' || activeSubTab === 'dori' ? selectedDoc.Lot_Number :
+                        selectedDoc.rgpNo
                   ) ? (
                     <>
                       <RefreshCw className="spin-animation" size={18} />
@@ -1142,7 +1142,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
           </div>
         </div>
       )}
-      
+
       {/* Local spinner rotation animation style */}
       <style>{`
         .spin-animation {

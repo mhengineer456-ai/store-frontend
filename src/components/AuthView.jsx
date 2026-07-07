@@ -18,12 +18,7 @@ export default function AuthView({ onLoginSuccess }) {
   const [regConfirmPassword, setRegConfirmPassword] = useState('');
   const [regRole, setRegRole] = useState('Designer');
   const [adminCode, setAdminCode] = useState('');
-  
-  // OTP Verification States
-  const [isOtpModalOpen, setIsOtpModalOpen] = useState(false);
-  const [otpInputs, setOtpInputs] = useState(['', '', '', '', '', '']);
-  const [otpError, setOtpError] = useState('');
-  const [simulatedOtp, setSimulatedOtp] = useState('');
+  const [securityCode, setSecurityCode] = useState('');
   
   // UI Helpers
   const [showPassword, setShowPassword] = useState(false);
@@ -31,16 +26,6 @@ export default function AuthView({ onLoginSuccess }) {
   const [success, setSuccess] = useState('');
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // Focus references for OTP input fields
-  const otpRefs = [
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null),
-    useRef(null)
-  ];
 
   // Auto-dismiss toast after 15 seconds
   useEffect(() => {
@@ -101,15 +86,21 @@ export default function AuthView({ onLoginSuccess }) {
     }
   };
 
-  // Pre-Register submit (posts details to server, triggers OTP send)
+  // Pre-Register submit (posts details to server, directly verifies with Security Code)
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
 
-    if (!regName || !regEmail || !regPassword || !regConfirmPassword) {
+    if (!regName || !regEmail || !regPassword || !regConfirmPassword || !securityCode) {
       setError('Please fill in all fields.');
+      setLoading(false);
+      return;
+    }
+
+    if (securityCode.trim() !== 'MHSTORE2026@') {
+      setError('Invalid Security Code. Use MHSTORE2026@ to register.');
       setLoading(false);
       return;
     }
@@ -135,6 +126,7 @@ export default function AuthView({ onLoginSuccess }) {
           email: regEmail,
           password: regPassword,
           role: regRole,
+          securityCode: securityCode,
           adminCode: regRole === 'Admin' ? adminCode : undefined
         })
       });
@@ -147,89 +139,17 @@ export default function AuthView({ onLoginSuccess }) {
         return;
       }
 
-      setOtpInputs(['', '', '', '', '', '']);
-      setOtpError('');
-      setSimulatedOtp(data.simulatedOtp || '');
-      setIsOtpModalOpen(true);
-      setLoading(false);
-
-      // Trigger toast message
-      setToast({
-        type: 'Email Verification Sent',
-        to: regEmail,
-        simulatedOtp: data.simulatedOtp
-      });
-
-      // Auto-focus first input field
-      setTimeout(() => {
-        if (otpRefs[0].current) {
-          otpRefs[0].current.focus();
-        }
-      }, 150);
-    } catch (err) {
-      console.error('Registration error:', err);
-      setError('Cannot connect to the backend server. Please verify it is running.');
-      setLoading(false);
-    }
-  };
-
-  // OTP digit handling with auto-focus shifting
-  const handleOtpChange = (index, value) => {
-    const cleanValue = value.replace(/[^0-9]/g, '').slice(-1);
-    
-    const newInputs = [...otpInputs];
-    newInputs[index] = cleanValue;
-    setOtpInputs(newInputs);
-
-    // Shift focus to next input if typing a number
-    if (cleanValue && index < 5) {
-      otpRefs[index + 1].current.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (index, e) => {
-    // Shift focus to previous input on backspace if current is empty
-    if (e.key === 'Backspace' && !otpInputs[index] && index > 0) {
-      otpRefs[index - 1].current.focus();
-    }
-  };
-
-  // Handle Verify OTP on backend
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setOtpError('');
-    
-    const enteredCode = otpInputs.join('');
-    if (enteredCode.length < 6) {
-      setOtpError('Please enter all 6 digits of the OTP.');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: regEmail, otpCode: enteredCode })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setOtpError(data.error || 'Invalid OTP code.');
-        return;
-      }
-
-      setIsOtpModalOpen(false);
-      setToast(null);
-      setSimulatedOtp('');
-      setSuccess('Email verified successfully! You can now log in.');
-
-      // Clear fields
+      setSuccess('Registration successful! You can now log in.');
       const tempEmail = regEmail;
+      
+      // Clear fields
       setRegName('');
       setRegEmail('');
       setRegPassword('');
       setRegConfirmPassword('');
+      setSecurityCode('');
+      setAdminCode('');
+      setLoading(false);
 
       // Shift to login
       setTimeout(() => {
@@ -238,8 +158,9 @@ export default function AuthView({ onLoginSuccess }) {
         setSuccess('');
       }, 1500);
     } catch (err) {
-      console.error('OTP verification error:', err);
-      setOtpError('Cannot connect to the server to verify OTP.');
+      console.error('Registration error:', err);
+      setError('Cannot connect to the backend server. Please verify it is running.');
+      setLoading(false);
     }
   };
 
@@ -507,101 +428,32 @@ export default function AuthView({ onLoginSuccess }) {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary auth-submit-btn" disabled={loading}>
-              <span>{loading ? 'Sending Code...' : 'Sign Up'}</span>
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label className="form-label">Security Code</label>
+              <div className="auth-input-wrapper">
+                <span className="auth-input-icon-left">
+                  <Lock size={18} style={{ color: 'var(--accent-color)' }} />
+                </span>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  placeholder="Enter signup security code"
+                  value={securityCode}
+                  onChange={(e) => setSecurityCode(e.target.value)}
+                  required 
+                  disabled={loading}
+                  style={{ borderColor: 'var(--accent-color)' }}
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="btn btn-primary auth-submit-btn" style={{ marginTop: '20px' }} disabled={loading}>
+              <span>{loading ? 'Registering...' : 'Sign Up'}</span>
               {!loading && <ArrowRight size={16} />}
             </button>
           </form>
         )}
       </div>
-
-      {/* OTP Verification Modal */}
-      {isOtpModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-content animate-scale" style={{ maxWidth: '420px', padding: '28px' }}>
-            <div className="modal-header" style={{ marginBottom: '16px' }}>
-              <h3 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Mail size={20} style={{ color: 'var(--accent-color)' }} />
-                <span>Email Verification</span>
-              </h3>
-              <button 
-                className="modal-close" 
-                onClick={() => {
-                  setIsOtpModalOpen(false);
-                  setToast(null);
-                  setSimulatedOtp('');
-                }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleVerifyOtp}>
-              <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.4' }}>
-                For security reasons, we've sent a 6-digit verification code to your email address: <strong>{regEmail}</strong>. Please enter the OTP code below to verify your email and complete your registration.
-              </p>
-
-              {simulatedOtp && (
-                <div style={{
-                  padding: '12px 14px',
-                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                  border: '1.5px dashed rgba(245, 158, 11, 0.4)',
-                  borderRadius: 'var(--border-radius-sm)',
-                  marginBottom: '16px',
-                  color: '#d97706',
-                  fontSize: '13px',
-                  fontWeight: '500',
-                  textAlign: 'center'
-                }}>
-                  🛠️ [Developer Sandbox Mode]<br/>
-                  Simulated OTP Code: <strong style={{ fontSize: '18px', color: '#b45309', fontFamily: 'monospace', letterSpacing: '2px' }}>{simulatedOtp}</strong>
-                </div>
-              )}
-
-              {otpError && (
-                <div className="auth-alert error" style={{ padding: '8px 12px', marginBottom: '16px' }}>
-                  <ShieldAlert size={16} />
-                  <span>{otpError}</span>
-                </div>
-              )}
-
-              {/* Six Numeric Boxes */}
-              <div className="otp-input-container">
-                {otpInputs.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={otpRefs[index]}
-                    type="text"
-                    maxLength={1}
-                    className="otp-box"
-                    value={digit}
-                    onChange={(e) => handleOtpChange(index, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    required
-                  />
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => {
-                    setIsOtpModalOpen(false);
-                    setToast(null);
-                    setSimulatedOtp('');
-                  }}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Verify Email
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

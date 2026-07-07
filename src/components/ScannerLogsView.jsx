@@ -108,7 +108,8 @@ export default function ScannerLogsView({ currencySymbol = 'R' }) {
         display: 'flex',
         gap: '12px',
         marginBottom: '20px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        alignItems: 'center'
       }}>
         {/* Search */}
         <div style={{ position: 'relative', flex: '1 1 280px' }}>
@@ -117,24 +118,52 @@ export default function ScannerLogsView({ currencySymbol = 'R' }) {
             left: '12px',
             top: '50%',
             transform: 'translateY(-50%)',
-            color: 'var(--text-muted)'
+            color: 'var(--text-muted)',
+            display: 'flex',
+            alignItems: 'center'
           }} />
           <input
             type="text"
-            className="form-control"
+            className="form-input"
             placeholder="Search by Lot, Person, Material or Supplier..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ paddingLeft: '38px', width: '100%', boxSizing: 'border-box' }}
+            style={{
+              paddingLeft: '38px',
+              height: '38px',
+              fontSize: '13px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-secondary, #ffffff)',
+              color: 'var(--text-main)',
+              width: '100%',
+              outline: 'none',
+              transition: 'border-color 0.2s'
+            }}
           />
         </div>
 
         {/* Filter */}
         <select
-          className="form-control"
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          style={{ flex: '0 1 180px', cursor: 'pointer' }}
+          style={{
+            flex: '0 1 180px',
+            height: '38px',
+            fontSize: '13px',
+            padding: '0 28px 0 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-secondary, #ffffff)',
+            color: 'var(--text-main)',
+            cursor: 'pointer',
+            outline: 'none',
+            appearance: 'none',
+            backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%223%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 10px center',
+            transition: 'border-color 0.2s'
+          }}
         >
           <option value="all">All Scan Types</option>
           <option value="gate_entry">Gate Entry</option>
