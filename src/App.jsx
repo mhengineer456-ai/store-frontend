@@ -241,7 +241,8 @@ const hasTabAccess = (tabName, role) => {
       'generate_po',
       'history',
       'scanner_logs',
-      'po_verification'
+      'po_verification',
+      'approval_queue'
     ].includes(tabName);
   }
   if (panel === 'store') {
@@ -254,7 +255,8 @@ const hasTabAccess = (tabName, role) => {
       'material_transfer',
       'history',
       'scanner_logs',
-      'po_verification'
+      'po_verification',
+      'approval_queue'
     ].includes(tabName);
   }
   return false;
@@ -440,7 +442,7 @@ export default function App() {
       material_transfer: 'Material Transfer',
       reports_history: 'Report and History',
       settings: 'Setting',
-      approval_queue: 'Approval Queue'
+      approval_queue: currentUser?.role === 'Admin' ? 'Approval Queue' : 'My Requests'
     };
     const title = pageTitles[activeTab] || 'MH Store';
     document.title = `Garment PDMS - ${title}`;
@@ -1662,6 +1664,20 @@ export default function App() {
                   <CheckCircle size={18} />
                   <span className="sidebar-text">PO Verification</span>
                 </li>
+                <li className={`sidebar-item ${activeTab === 'approval_queue' ? 'active' : ''}`} onClick={() => setActiveTab('approval_queue')} style={{ position: 'relative' }}>
+                  <Shield size={18} />
+                  <span className="sidebar-text">My Requests</span>
+                  {approvalRequests.filter(r => r.requesterName === currentUser?.name && r.status === 'pending').length > 0 && (
+                    <span style={{
+                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                      backgroundColor: 'var(--warning)', color: '#fff', fontSize: '10px',
+                      fontWeight: '800', padding: '2px 6px', borderRadius: '10px',
+                      lineHeight: 1
+                    }}>
+                      {approvalRequests.filter(r => r.requesterName === currentUser?.name && r.status === 'pending').length}
+                    </span>
+                  )}
+                </li>
               </>
             )}
 
@@ -1699,6 +1715,20 @@ export default function App() {
                 <li className={`sidebar-item ${activeTab === 'po_verification' ? 'active' : ''}`} onClick={() => setActiveTab('po_verification')}>
                   <CheckCircle size={18} />
                   <span className="sidebar-text">PO Verification</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'approval_queue' ? 'active' : ''}`} onClick={() => setActiveTab('approval_queue')} style={{ position: 'relative' }}>
+                  <Shield size={18} />
+                  <span className="sidebar-text">My Requests</span>
+                  {approvalRequests.filter(r => r.requesterName === currentUser?.name && r.status === 'pending').length > 0 && (
+                    <span style={{
+                      position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                      backgroundColor: 'var(--warning)', color: '#fff', fontSize: '10px',
+                      fontWeight: '800', padding: '2px 6px', borderRadius: '10px',
+                      lineHeight: 1
+                    }}>
+                      {approvalRequests.filter(r => r.requesterName === currentUser?.name && r.status === 'pending').length}
+                    </span>
+                  )}
                 </li>
               </>
             )}
@@ -1793,7 +1823,7 @@ export default function App() {
               {activeTab === 'material_transfer' && 'Material Transfer'}
               {activeTab === 'reports_history' && 'Report and History'}
               {activeTab === 'settings' && 'Setting'}
-              {activeTab === 'approval_queue' && 'Approval Queue'}
+              {activeTab === 'approval_queue' && (currentUser?.role === 'Admin' ? 'Approval Queue' : 'My Requests')}
               {activeTab === 'po_verification' && 'PO Verification'}
             </h1>
           </div>

@@ -1278,14 +1278,16 @@ const matchesStatus = filterStatus === 'all' ? true : req.status === filterStatu
         </div>
 
         {/* Requesters Dropdown */}
-        <div className="filter-select-wrapper">
-          <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
-            <option value="all">User</option>
-            {uniqueRequesters.map(u => (
-              <option key={u} value={u}>{u}</option>
-            ))}
-          </select>
-        </div>
+        {isAdmin && (
+          <div className="filter-select-wrapper">
+            <select value={filterUser} onChange={(e) => setFilterUser(e.target.value)}>
+              <option value="all">User</option>
+              {uniqueRequesters.map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Reset Filters btn */}
         <button className="reset-filter-btn" onClick={handleResetFilters}>
