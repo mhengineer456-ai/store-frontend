@@ -102,20 +102,6 @@ body {
   min-height: 100vh;
 }
 
-@media (max-width: 1024px) {
-  .app-container {
-    grid-template-columns: 80px 1fr;
-  }
-
-  .sidebar-text {
-    display: none;
-  }
-
-  .sidebar-logo span {
-    display: none;
-  }
-}
-
 /* Sidebar Styling */
 .sidebar {
   background-color: var(--sidebar-bg);
@@ -1713,21 +1699,91 @@ body.dark-theme .custom-dropdown-menu {
   display: none !important;
 }
 
-/* Tablet Layout Constraints */
-@media (max-width: 1024px) {
+.sidebar-overlay {
+  display: none;
+}
+
+/* ==========================================================================
+   DEVICE CAPABILITIES (BREAKPOINTS)
+   ========================================================================== */
+
+/* 🖥️ Desktop (1440px+) */
+@media (min-width: 1440px) {
   .app-container {
-    grid-template-columns: 80px 1fr !important;
+    grid-template-columns: 260px 1fr !important;
+  }
+  .sidebar {
+    position: static !important;
+    width: 260px !important;
+    transform: none !important;
+    display: flex !important;
   }
   .sidebar-text, .sidebar-logo-text {
+    display: inline !important;
+  }
+  .mobile-menu-toggle, .mobile-sidebar-close {
     display: none !important;
   }
-  .mobile-menu-toggle {
+  .sidebar-overlay {
     display: none !important;
   }
 }
 
-/* Mobile & Portrait Tablet Layout Constraints */
-@media (max-width: 768px) {
+/* 💻 Laptop (1024px–1439px) */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .app-container {
+    grid-template-columns: 240px 1fr !important;
+  }
+  .sidebar {
+    position: static !important;
+    width: 240px !important;
+    transform: none !important;
+    display: flex !important;
+  }
+  .sidebar-text, .sidebar-logo-text {
+    display: inline !important;
+  }
+  .mobile-menu-toggle, .mobile-sidebar-close {
+    display: none !important;
+  }
+  .sidebar-overlay {
+    display: none !important;
+  }
+}
+
+/* 📱 Tablet (768px–1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-container {
+    grid-template-columns: 80px 1fr !important;
+  }
+  .sidebar {
+    position: static !important;
+    width: 80px !important;
+    transform: none !important;
+    display: flex !important;
+    padding: 24px 8px !important;
+  }
+  .sidebar-text, .sidebar-logo-text {
+    display: none !important;
+  }
+  .mobile-menu-toggle, .mobile-sidebar-close {
+    display: none !important;
+  }
+  .sidebar-overlay {
+    display: none !important;
+  }
+  
+  /* Squeeze grids slightly for tablets */
+  .grid-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .form-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+/* 📱 Mobile (320px–767px) */
+@media (min-width: 320px) and (max-width: 767px) {
   .app-container {
     grid-template-columns: 1fr !important;
     position: relative;
@@ -1790,6 +1846,8 @@ body.dark-theme .custom-dropdown-menu {
     padding: 16px !important;
     gap: 12px;
     flex-wrap: wrap;
+    height: auto !important;
+    min-height: 70px;
   }
   
   .top-header h1 {
@@ -1797,7 +1855,8 @@ body.dark-theme .custom-dropdown-menu {
   }
 
   /* Adjust Main Panels, Forms and Grids to stack vertically */
-  .po-grid-2, .grid-3, .dashboard-grid, .weight-capture-grid {
+  .po-grid-2, .grid-3, .dashboard-grid, .weight-capture-grid, .split-view, .form-grid,
+  div[style*="grid-template-columns"]:not([style*="minmax"]) {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
   }
@@ -1806,8 +1865,13 @@ body.dark-theme .custom-dropdown-menu {
     padding: 16px !important;
   }
 
-  .custom-table-container {
+  .custom-table-container, .table-responsive {
     overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .custom-table-container table, .table-responsive table {
+    min-width: 600px !important;
   }
 
   /* Styling details cards to fit small screens */
@@ -1822,5 +1886,18 @@ body.dark-theme .custom-dropdown-menu {
   /* Adjust print views hide */
   .screen-only-element {
     width: 100% !important;
+  }
+
+  /* Sidebar Backdrop Overlay on Mobile */
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 999;
+    backdrop-filter: blur(2px);
   }
 }

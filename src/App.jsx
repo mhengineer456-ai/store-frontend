@@ -1501,6 +1501,13 @@ export default function App() {
           </button>
         </div>
       )}
+      {/* Sidebar Overlay for Mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
       {/* Sidebar Navigation */}
       <aside className="sidebar">
         <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>

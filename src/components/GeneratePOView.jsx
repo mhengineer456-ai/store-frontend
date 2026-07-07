@@ -2194,7 +2194,7 @@ export default function GeneratePOView({
               </div>
 
               {/* Paper Items Table */}
-              <div className="custom-table-container" style={{ overflow: 'visible' }}>
+              <div className="custom-table-container">
                 <table className="custom-table" style={{ background: 'transparent' }}>
                   <thead>
                     <tr>

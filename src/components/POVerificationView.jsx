@@ -274,6 +274,61 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
       ? (((po.totalReceived - po.totalOrdered) / po.totalOrdered) * 100).toFixed(1)
       : '0.0';
 
+    const varianceVal = Math.abs(parseFloat(percentageDiff));
+    const isApproved = varianceVal <= 5.0;
+    
+    // Status box HTML (Black and White)
+    const approvalStatusHtml = isApproved
+      ? `
+        <div style="border: 1.5px solid #000000; background-color: #f3f4f6; color: #000000; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 12px; text-align: center; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Inter', sans-serif;">
+          ✔ STATUS: APPROVED (Variance is ${percentageDiff}%, within ±5.0% limit)
+        </div>
+      `
+      : `
+        <div style="border: 2px dashed #000000; background-color: #ffffff; color: #000000; padding: 8px 12px; border-radius: 4px; font-weight: bold; font-size: 12px; text-align: center; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Inter', sans-serif;">
+          ⚠ STATUS: REQUIRES AUTHORIZATION SIGNATURE (Variance is ${percentageDiff}%, exceeds ±5.0% limit)
+        </div>
+      `;
+
+    // Signature lines HTML (Black and White)
+    const signatureHtml = `
+      <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; gap: 40px; font-family: 'Inter', sans-serif;">
+        <div style="text-align: center; flex: 1;">
+          <div style="height: 25px;"></div>
+          <div style="border-top: 1.5px solid #000000; padding-top: 6px; font-weight: bold; color: #000;">Store In-Charge Signature</div>
+        </div>
+        <div style="text-align: center; flex: 1;">
+          <div style="height: 25px;"></div>
+          <div style="border-top: 1.5px solid #000000; padding-top: 6px; font-weight: bold; color: #000;">Audited & Verified By</div>
+        </div>
+        ${!isApproved ? `
+          <div style="text-align: center; flex: 1; border: 1.2px dashed #000000; padding: 8px 10px; border-radius: 4px; background-color: #ffffff;">
+            <div style="font-size: 9px; color: #000000; font-weight: 800; text-transform: uppercase; margin-bottom: 12px;">⚠ Authorization Required</div>
+            <div style="border-top: 1.2px solid #000000; padding-top: 6px; font-weight: bold; color: #000000; font-size: 11px;">Authorized Signature</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    const rgpSignatureHtml = `
+      <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-start; font-size: 12px; gap: 40px; font-family: 'Inter', sans-serif;">
+        <div style="text-align: center; flex: 1;">
+          <div style="height: 25px;"></div>
+          <div style="border-top: 1.5px solid #000000; padding-top: 6px; font-weight: bold; color: #000;">Security Officer Signature</div>
+        </div>
+        <div style="text-align: center; flex: 1;">
+          <div style="height: 25px;"></div>
+          <div style="border-top: 1.5px solid #000000; padding-top: 6px; font-weight: bold; color: #000;">Store In-Charge Signature</div>
+        </div>
+        ${!isApproved ? `
+          <div style="text-align: center; flex: 1; border: 1.2px dashed #000000; padding: 8px 10px; border-radius: 4px; background-color: #ffffff;">
+            <div style="font-size: 9px; color: #000000; font-weight: 800; text-transform: uppercase; margin-bottom: 12px;">⚠ Authorization Required</div>
+            <div style="border-top: 1.2px solid #000000; padding-top: 6px; font-weight: bold; color: #000000; font-size: 11px;">Authorized Signature</div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+
     let printTemplate = '';
 
     if (po.type === 'General') {
@@ -285,16 +340,16 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
 
         return `
           <tr style="border-bottom: 1px solid #000000;">
-            <td style="padding: 10px; font-size: 13px; text-align: center;">${idx + 1}</td>
-            <td style="padding: 10px; font-size: 13px;">Trims</td>
-            <td style="padding: 10px; font-size: 13px; font-weight: bold; color: #000000;">${item.name}</td>
-            <td style="padding: 10px; font-size: 13px;"></td>
-            <td style="padding: 10px; font-size: 13px; text-align: center;">PCS</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${item.ordered}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${received}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">${idx + 1}</td>
+            <td style="padding: 5px; font-size: 11px;">Trims</td>
+            <td style="padding: 5px; font-size: 11px; font-weight: bold; color: #000000;">${item.name}</td>
+            <td style="padding: 5px; font-size: 11px;"></td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">PCS</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center; font-weight: bold;">${item.ordered}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center; font-weight: bold;">${received}</td>
             ${isAdmin ? `
-              <td style="padding: 10px; font-size: 13px; text-align: right;">${rate.toFixed(2)}</td>
-              <td style="padding: 10px; font-size: 13px; text-align: right;">${amount}</td>
+              <td style="padding: 5px; font-size: 11px; text-align: right;">${rate.toFixed(2)}</td>
+              <td style="padding: 5px; font-size: 11px; text-align: right;">${amount}</td>
             ` : ''}
           </tr>
         `;
@@ -309,16 +364,20 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
           <head>
             <title>Purchase Order Original - ${po.poNumber}</title>
             <style>
-              body { font-family: 'Inter', sans-serif; color: #000000; margin: 0; padding: 40px; background-color: #ffffff; }
-              .header-title { text-align: center; font-size: 20px; font-weight: bold; border-bottom: 3px double #000000; padding-bottom: 8px; margin-bottom: 24px; text-transform: uppercase; }
-              .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
-              .border-box { border: 1.5px solid #000000; border-radius: 4px; padding: 12px; }
-              .box-title { font-size: 11px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 4px; margin-bottom: 8px; }
-              .box-row { font-size: 12px; margin-bottom: 4px; }
+              body { font-family: 'Inter', sans-serif; color: #000000; margin: 0; padding: 15px; background-color: #ffffff; line-height: 1.2; }
+              .header-title { text-align: center; font-size: 16px; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 4px; margin-bottom: 12px; text-transform: uppercase; }
+              .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+              .border-box { border: 1px solid #000000; border-radius: 4px; padding: 8px; }
+              .box-title { font-size: 10px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 2px; margin-bottom: 6px; }
+              .box-row { font-size: 11px; margin-bottom: 2px; }
               .box-row strong { font-weight: bold; }
-              table { width: 100%; border-collapse: collapse; margin-bottom: 24px; border: 1.5px solid #000000; }
-              th, td { border: 1.5px solid #000000; padding: 10px; font-size: 13px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 1.5px solid #000000; }
+              th, td { border: 1px solid #000000; padding: 5px 8px; font-size: 11px; }
               th { text-transform: uppercase; text-align: left; font-weight: 800; background-color: #eee; }
+              @media print {
+                @page { size: portrait; margin: 6mm; }
+                body { padding: 0; margin: 0; }
+              }
             </style>
           </head>
           <body>
@@ -342,113 +401,112 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </div>
             </div>
 
-            <div style="background-color: #ffffff; border: 2px solid #000000; padding: 12px; border-radius: 4px; margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+            <div style="background-color: #ffffff; border: 1.5px solid #000000; padding: 6px 12px; border-radius: 4px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">PO Order Qty</div>
-                <div style="font-size: 16px; font-weight: 800;">${po.totalOrdered} pcs</div>
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">PO Order Qty</div>
+                <div style="font-size: 13px; font-weight: 800;">${po.totalOrdered} pcs</div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Total Received</div>
-                <div style="font-size: 16px; font-weight: 800;">${po.totalReceived} pcs</div>
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Total Received</div>
+                <div style="font-size: 13px; font-weight: 800;">${po.totalReceived} pcs</div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Receipt Difference</div>
-                <div style="font-size: 16px; font-weight: 800;">
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Receipt Difference</div>
+                <div style="font-size: 13px; font-weight: 800;">
                   ${difference === 0 ? '0' : (difference > 0 ? `+${difference}` : difference)} pcs
                 </div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Compliance Ratio</div>
-                <div style="font-size: 16px; font-weight: 800;">
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Compliance Ratio</div>
+                <div style="font-size: 13px; font-weight: 800;">
                   ${percentage}%
-                  <span style="font-size: 9px; font-weight: bold; display: block; margin-top: 2px; color: #000;">
-                    (${difference === 0 ? 'Exact Match' : (difference > 0 ? `+${percentageDiff}% Extra` : `${percentageDiff}% Short`)})
+                  <span style="font-size: 8px; font-weight: bold; display: block; margin-top: 1px; color: #000;">
+                    (${difference === 0 ? 'Exact' : (difference > 0 ? `+${percentageDiff}%` : `${percentageDiff}%`)})
                   </span>
                 </div>
               </div>
             </div>
 
-            <h3 style="font-size: 14px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #000;">1. ORDER VS CAPTURED QUANTITY SUMMARY</h3>
+            ${approvalStatusHtml}
+
+            <h3 style="font-size: 12px; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1.5px solid #000; padding-bottom: 2px;">1. ORDER VS CAPTURED QUANTITY SUMMARY</h3>
             <table>
               <thead>
-                <tr>
-                  <th style="text-align: center; width: 40px;">#</th>
-                  <th>Department</th>
-                  <th>Description</th>
-                  <th>Shade</th>
-                  <th style="text-align: center;">UOM</th>
-                  <th style="text-align: center;">PO Target (pcs)</th>
-                  <th style="text-align: center;">Captured Recv (pcs)</th>
+                <tr style="background-color: #eee;">
+                  <th style="text-align: center; width: 30px; padding: 4px;">#</th>
+                  <th style="padding: 4px;">Department</th>
+                  <th style="padding: 4px;">Description</th>
+                  <th style="padding: 4px;">Shade</th>
+                  <th style="text-align: center; padding: 4px;">UOM</th>
+                  <th style="text-align: center; padding: 4px;">PO Target (pcs)</th>
+                  <th style="text-align: center; padding: 4px;">Captured Recv (pcs)</th>
                   ${isAdmin ? `
-                    <th style="text-align: right;">Rate</th>
-                    <th style="text-align: right;">Amount</th>
+                    <th style="text-align: right; padding: 4px;">Rate</th>
+                    <th style="text-align: right; padding: 4px;">Amount</th>
                   ` : ''}
                 </tr>
               </thead>
               <tbody>
                 ${rowsHtml}
                 <tr style="font-weight: bold; background-color: #eee;">
-                  <td colspan="5" style="padding: 10px; font-size: 13px; font-weight: bold; text-align: right;">TOTAL QUANTITY:</td>
-                  <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${po.totalOrdered}</td>
-                  <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${po.totalReceived}</td>
+                  <td colspan="5" style="padding: 4px 6px; font-size: 11px; font-weight: bold; text-align: right;">TOTAL QUANTITY:</td>
+                  <td style="padding: 4px 6px; font-size: 11px; text-align: center; font-weight: bold;">${po.totalOrdered}</td>
+                  <td style="padding: 4px 6px; font-size: 11px; text-align: center; font-weight: bold;">${po.totalReceived}</td>
                   ${isAdmin ? `
-                    <td style="padding: 10px; font-size: 13px; text-align: right;">—</td>
-                    <td style="padding: 10px; font-size: 13px; text-align: right; font-weight: bold;">${subtotal.toFixed(2)}</td>
+                    <td style="padding: 4px 6px; font-size: 11px; text-align: right;">—</td>
+                    <td style="padding: 4px 6px; font-size: 11px; text-align: right; font-weight: bold;">${subtotal.toFixed(2)}</td>
                   ` : ''}
                 </tr>
               </tbody>
             </table>
 
             ${isAdmin ? `
-              <div style="display: flex; justify-content: flex-end; margin-bottom: 40px;">
-                <div style="width: 250px; border: 1.5px solid #000; padding: 10px; border-radius: 4px; font-size: 13px;">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>Subtotal:</strong></span><span>${subtotal.toFixed(2)}</span></div>
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span><strong>GST 12%:</strong></span><span>${gst.toFixed(2)}</span></div>
-                  <div style="display: flex; justify-content: space-between; font-size: 15px; border-top: 1.5px solid #000; padding-top: 4px; margin-top: 4px;"><span><strong>Grand Total:</strong></span><span><strong>${grandTotal.toFixed(2)}</strong></span></div>
+              <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+                <div style="width: 200px; border: 1px solid #000; padding: 6px; border-radius: 4px; font-size: 11px;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span><strong>Subtotal:</strong></span><span>${subtotal.toFixed(2)}</span></div>
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 2px;"><span><strong>GST 12%:</strong></span><span>${gst.toFixed(2)}</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 12px; border-top: 1px solid #000; padding-top: 2px; margin-top: 2px;"><span><strong>Grand Total:</strong></span><span><strong>${grandTotal.toFixed(2)}</strong></span></div>
                 </div>
               </div>
             ` : ''}
 
-            <h3 style="font-size: 14px; margin-top: 40px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #000;">2. WEIGHBRIDGE INDIVIDUAL RECEIPTS RECORD</h3>
+            <h3 style="font-size: 12px; margin-top: 15px; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1.5px solid #000; padding-bottom: 2px;">2. WEIGHBRIDGE INDIVIDUAL RECEIPTS RECORD</h3>
             ${po.matchingCaptures.length > 0 ? `
               <table>
                 <thead>
-                  <tr>
-                    <th>S.No</th>
-                    <th>Date & Time</th>
-                    <th>Material Received</th>
-                    <th>Material Code</th>
-                    <th style="text-align: right;">Gross Wt</th>
-                    <th style="text-align: right;">Net Wt</th>
-                    <th style="text-align: right;">Calculated Pieces</th>
-                    <th>Captured By</th>
+                  <tr style="background-color: #eee;">
+                    <th style="padding: 4px; text-align: center;">S.No</th>
+                    <th style="padding: 4px;">Date & Time</th>
+                    <th style="padding: 4px;">Material</th>
+                    <th style="padding: 4px;">Code</th>
+                    <th style="padding: 4px; text-align: right;">Gross Wt</th>
+                    <th style="padding: 4px; text-align: right;">Net Wt</th>
+                    <th style="padding: 4px; text-align: right;">Pieces</th>
+                    <th style="padding: 4px;">By</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${po.matchingCaptures.map((cap, idx) => `
                     <tr style="border-bottom: 1px solid #000000;">
-                      <td style="padding: 8px; font-size: 12px; text-align: center;">${idx + 1}</td>
-                      <td style="padding: 8px; font-size: 12px;">${new Date(cap.capturedAt).toLocaleString('en-GB')}</td>
-                      <td style="padding: 8px; font-size: 12px; font-weight: bold;">${cap.materialName}</td>
-                      <td style="padding: 8px; font-size: 12px; font-family: monospace;">${cap.materialCode}</td>
-                      <td style="padding: 8px; font-size: 12px; text-align: right;">${cap.grossWeightKg} kg</td>
-                      <td style="padding: 8px; font-size: 12px; text-align: right;">${cap.netWeightKg} kg</td>
-                      <td style="padding: 8px; font-size: 12px; text-align: right; font-weight: bold;">${cap.pieces}</td>
-                      <td style="padding: 8px; font-size: 12px;">${cap.storeIncharge || 'System'}</td>
+                      <td style="padding: 4px; font-size: 10px; text-align: center;">${idx + 1}</td>
+                      <td style="padding: 4px; font-size: 10px;">${new Date(cap.capturedAt).toLocaleString('en-GB')}</td>
+                      <td style="padding: 4px; font-size: 10px; font-weight: bold;">${cap.materialName}</td>
+                      <td style="padding: 4px; font-size: 10px; font-family: monospace;">${cap.materialCode}</td>
+                      <td style="padding: 4px; font-size: 10px; text-align: right;">${cap.grossWeightKg} kg</td>
+                      <td style="padding: 4px; font-size: 10px; text-align: right;">${cap.netWeightKg} kg</td>
+                      <td style="padding: 4px; font-size: 10px; text-align: right; font-weight: bold;">${cap.pieces}</td>
+                      <td style="padding: 4px; font-size: 10px;">${cap.storeIncharge || 'System'}</td>
                     </tr>
                   `).join('')}
                 </tbody>
               </table>
             ` : `
-              <div style="padding: 20px; border: 2px dashed #000000; text-align: center; font-size: 13px; font-weight: bold;">
+              <div style="padding: 12px; border: 1.5px dashed #000000; text-align: center; font-size: 11px; font-weight: bold; margin-bottom: 12px;">
                 No captured weighbridge receipts found.
               </div>
             `}
 
-            <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 13px;">
-              <div style="text-align: center; width: 200px; border-top: 2px solid #000000; padding-top: 8px; font-weight: bold; color: #000;">Store In-Charge Signature</div>
-              <div style="text-align: center; width: 200px; border-top: 2px solid #000000; padding-top: 8px; font-weight: bold; color: #000;">Audited & Verified By</div>
-            </div>
+            ${signatureHtml}
             <script>window.onload = function() { window.print(); }</script>
           </body>
         </html>
@@ -468,15 +526,15 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
 
         return `
           <tr style="border-bottom: 1px solid #000000;">
-            <td style="padding: 10px; font-size: 13px; font-weight: bold; color: #000000;">${zipType}</td>
-            <td style="padding: 10px; font-size: 13px;">${placement}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center;">${colour}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center;">${zipColour}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${item.ordered}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${received}</td>
+            <td style="padding: 5px; font-size: 11px; font-weight: bold; color: #000000;">${zipType}</td>
+            <td style="padding: 5px; font-size: 11px;">${placement}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">${colour}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">${zipColour}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center; font-weight: bold;">${item.ordered}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center; font-weight: bold;">${received}</td>
             ${isAdmin ? `
-              <td style="padding: 10px; font-size: 13px; text-align: right;">${Number(price).toFixed(2)}</td>
-              <td style="padding: 10px; font-size: 13px; text-align: right; font-weight: bold;">${totalCost}</td>
+              <td style="padding: 5px; font-size: 11px; text-align: right;">${Number(price).toFixed(2)}</td>
+              <td style="padding: 5px; font-size: 11px; text-align: right; font-weight: bold;">${totalCost}</td>
             ` : ''}
           </tr>
         `;
@@ -487,13 +545,17 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
           <head>
             <title>${typeText} PO DETAILS - ${po.poNumber}</title>
             <style>
-              body { font-family: 'Inter', sans-serif; color: #000000; margin: 0; padding: 40px; background-color: #ffffff; }
-              .header-title { text-align: center; font-size: 20px; font-weight: bold; border-bottom: 3px double #000000; padding-bottom: 8px; margin-bottom: 24px; text-transform: uppercase; }
-              .meta-table { width: 100%; border: 1.5px solid #000; margin-bottom: 24px; border-collapse: collapse; }
-              .meta-table td { border: 1px solid #000; padding: 8px 12px; font-size: 13px; }
-              table.items-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; border: 1.5px solid #000000; }
-              table.items-table th, table.items-table td { border: 1.5px solid #000000; padding: 10px; }
+              body { font-family: 'Inter', sans-serif; color: #000000; margin: 0; padding: 15px; background-color: #ffffff; line-height: 1.2; }
+              .header-title { text-align: center; font-size: 16px; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 4px; margin-bottom: 12px; text-transform: uppercase; }
+              .meta-table { width: 100%; border: 1px solid #000; margin-bottom: 12px; border-collapse: collapse; }
+              .meta-table td { border: 1px solid #000; padding: 5px 8px; font-size: 11px; }
+              table.items-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 1px solid #000000; }
+              table.items-table th, table.items-table td { border: 1px solid #000000; padding: 5px 8px; }
               table.items-table th { font-size: 11px; text-transform: uppercase; text-align: left; font-weight: 800; background-color: #eee; }
+              @media print {
+                @page { size: portrait; margin: 6mm; }
+                body { padding: 0; margin: 0; }
+              }
             </style>
           </head>
           <body>
@@ -517,31 +579,33 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </tr>
             </table>
 
-            <div style="background-color: #ffffff; border: 2px solid #000000; padding: 12px; border-radius: 4px; margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+            <div style="background-color: #ffffff; border: 1.5px solid #000000; padding: 6px 12px; border-radius: 4px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">PO Order Qty</div>
-                <div style="font-size: 16px; font-weight: 800;">${po.totalOrdered} pcs</div>
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">PO Order Qty</div>
+                <div style="font-size: 13px; font-weight: 800;">${po.totalOrdered} pcs</div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Total Received</div>
-                <div style="font-size: 16px; font-weight: 800;">${po.totalReceived} pcs</div>
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Total Received</div>
+                <div style="font-size: 13px; font-weight: 800;">${po.totalReceived} pcs</div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Receipt Difference</div>
-                <div style="font-size: 16px; font-weight: 800;">
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Receipt Difference</div>
+                <div style="font-size: 13px; font-weight: 800;">
                   ${difference === 0 ? '0' : (difference > 0 ? `+${difference}` : difference)} pcs
                 </div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Compliance Ratio</div>
-                <div style="font-size: 16px; font-weight: 800;">
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Compliance Ratio</div>
+                <div style="font-size: 13px; font-weight: 800;">
                   ${percentage}%
-                  <span style="font-size: 9px; font-weight: bold; display: block; margin-top: 2px; color: #000;">
-                    (${difference === 0 ? 'Exact Match' : (difference > 0 ? `+${percentageDiff}% Extra` : `${percentageDiff}% Short`)})
+                  <span style="font-size: 8px; font-weight: bold; display: block; margin-top: 1px; color: #000;">
+                    (${difference === 0 ? 'Exact' : (difference > 0 ? `+${percentageDiff}%` : `${percentageDiff}%`)})
                   </span>
                 </div>
               </div>
             </div>
+
+            ${approvalStatusHtml}
 
             <table class="items-table">
               <thead>
@@ -563,15 +627,15 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </tbody>
             </table>
 
-            <div style="border: 1.5px solid #000; padding: 12px; margin-bottom: 40px; font-size: 13px;">
-              <div style="font-weight: bold; border-bottom: 1.5px solid #000; padding-bottom: 4px; margin-bottom: 6px;">${typeText} TYPE SUMMARY</div>
+            <div style="border: 1px solid #000; padding: 6px 10px; margin-bottom: 12px; font-size: 11px;">
+              <div style="font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 4px;">${typeText} TYPE SUMMARY</div>
               <div style="display: flex; justify-content: space-between;">
                 <span>Total pieces for stitching lot:</span>
                 <strong>${po.totalOrdered} pcs</strong>
               </div>
             </div>
 
-            <h3 style="font-size: 14px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #000;">2. WEIGHBRIDGE INDIVIDUAL RECEIPTS RECORD</h3>
+            <h3 style="font-size: 12px; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1.5px solid #000; padding-bottom: 2px;">2. WEIGHBRIDGE INDIVIDUAL RECEIPTS RECORD</h3>
             ${po.matchingCaptures.length > 0 ? `
               <table class="items-table">
                 <thead>
@@ -607,10 +671,7 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </div>
             `}
 
-            <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 13px;">
-              <div style="text-align: center; width: 200px; border-top: 2px solid #000000; padding-top: 8px; font-weight: bold; color: #000;">Store In-Charge Signature</div>
-              <div style="text-align: center; width: 200px; border-top: 2px solid #000000; padding-top: 8px; font-weight: bold; color: #000;">Audited & Verified By</div>
-            </div>
+            ${signatureHtml}
             <script>window.onload = function() { window.print(); }</script>
           </body>
         </html>
@@ -620,11 +681,11 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
       const totalIssued = po.items.reduce((sum, item) => sum + (Number(item.ordered) || 0), 0);
       const totalBags = po.items.reduce((sum, item) => sum + (Number(item.bags) || 0), 0);
       const totalsRowHtml = `
-        <tr style="background-color: #f8fafc; font-weight: bold; border-top: 2px solid #000000;">
-          <td colSpan="6" style="padding: 10px; font-size: 13px; text-align: right; border-bottom: 2px solid #000000;">TOTAL QUANTITY:</td>
-          <td style="padding: 10px; font-size: 13px; text-align: center; border-bottom: 2px solid #000000;">${totalIssued}</td>
-          <td style="padding: 10px; font-size: 13px; text-align: center; border-bottom: 2px solid #000000;">${po.totalReceived}</td>
-          <td style="padding: 10px; font-size: 13px; text-align: center; border-bottom: 2px solid #000000;">${totalBags}</td>
+        <tr style="background-color: #f8fafc; font-weight: bold; border-top: 1.5px solid #000000;">
+          <td colSpan="6" style="padding: 5px; font-size: 11px; text-align: right; border-bottom: 1.5px solid #000000;">TOTAL QUANTITY:</td>
+          <td style="padding: 5px; font-size: 11px; text-align: center; border-bottom: 1.5px solid #000000;">${totalIssued}</td>
+          <td style="padding: 5px; font-size: 11px; text-align: center; border-bottom: 1.5px solid #000000;">${po.totalReceived}</td>
+          <td style="padding: 5px; font-size: 11px; text-align: center; border-bottom: 1.5px solid #000000;">${totalBags}</td>
         </tr>
       `;
       const itemizedRowsHtml = po.items.map((item, idx) => {
@@ -632,15 +693,15 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
 
         return `
           <tr style="border-bottom: 1px solid #000000;">
-            <td style="padding: 10px; font-size: 13px; text-align: center;">${idx + 1}</td>
-            <td style="padding: 10px; font-size: 13px; font-weight: bold;">${item.lotNo || po.poNumber}</td>
-            <td style="padding: 10px; font-size: 13px;">${item.dept || 'Stitching'}</td>
-            <td style="padding: 10px; font-size: 13px; font-weight: bold; color: #000000;">${item.name}</td>
-            <td style="padding: 10px; font-size: 13px;">${item.purpose || 'Stitching'}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center;">${item.uom || 'PCS'}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${item.ordered}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center; font-weight: bold;">${received}</td>
-            <td style="padding: 10px; font-size: 13px; text-align: center;">${item.bags || '0'}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">${idx + 1}</td>
+            <td style="padding: 5px; font-size: 11px; font-weight: bold;">${item.lotNo || po.poNumber}</td>
+            <td style="padding: 5px; font-size: 11px;">${item.dept || 'Stitching'}</td>
+            <td style="padding: 5px; font-size: 11px; font-weight: bold; color: #000000;">${item.name}</td>
+            <td style="padding: 5px; font-size: 11px;">${item.purpose || 'Stitching'}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">${item.uom || 'PCS'}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center; font-weight: bold;">${item.ordered}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center; font-weight: bold;">${received}</td>
+            <td style="padding: 5px; font-size: 11px; text-align: center;">${item.bags || '0'}</td>
           </tr>
         `;
       }).join('') + totalsRowHtml;
@@ -650,16 +711,20 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
           <head>
             <title>Returnable Gate Pass Audit - ${po.poNumber}</title>
             <style>
-              body { font-family: 'Inter', sans-serif; color: #000000; margin: 0; padding: 40px; background-color: #ffffff; }
-              .header-title { text-align: center; font-size: 20px; font-weight: bold; border-bottom: 3px double #000000; padding-bottom: 8px; margin-bottom: 24px; text-transform: uppercase; }
-              .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
-              .border-box { border: 1.5px solid #000000; border-radius: 4px; padding: 12px; }
-              .box-title { font-size: 11px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 4px; margin-bottom: 8px; }
-              .box-row { font-size: 12px; margin-bottom: 4px; }
+              body { font-family: 'Inter', sans-serif; color: #000000; margin: 0; padding: 15px; background-color: #ffffff; line-height: 1.2; }
+              .header-title { text-align: center; font-size: 16px; font-weight: bold; border-bottom: 2px solid #000000; padding-bottom: 4px; margin-bottom: 12px; text-transform: uppercase; }
+              .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+              .border-box { border: 1px solid #000000; border-radius: 4px; padding: 8px; }
+              .box-title { font-size: 10px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #000000; padding-bottom: 2px; margin-bottom: 6px; }
+              .box-row { font-size: 11px; margin-bottom: 2px; }
               .box-row strong { font-weight: bold; }
-              table { width: 100%; border-collapse: collapse; margin-bottom: 24px; border: 1.5px solid #000000; }
-              th, td { border: 1.5px solid #000000; padding: 10px; font-size: 13px; }
+              table { width: 100%; border-collapse: collapse; margin-bottom: 12px; border: 1.5px solid #000000; }
+              th, td { border: 1px solid #000000; padding: 5px 8px; font-size: 11px; }
               th { text-transform: uppercase; text-align: left; font-weight: 800; background-color: #eee; }
+              @media print {
+                @page { size: portrait; margin: 6mm; }
+                body { padding: 0; margin: 0; }
+              }
             </style>
           </head>
           <body>
@@ -683,28 +748,30 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </div>
             </div>
 
-            <div style="background-color: #ffffff; border: 2px solid #000000; padding: 12px; border-radius: 4px; margin-bottom: 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+            <div style="background-color: #ffffff; border: 1.5px solid #000000; padding: 6px 12px; border-radius: 4px; margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">RGP Issued Qty</div>
-                <div style="font-size: 16px; font-weight: 800;">${po.totalOrdered} pcs</div>
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">RGP Issued Qty</div>
+                <div style="font-size: 13px; font-weight: 800;">${po.totalOrdered} pcs</div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Total Returned</div>
-                <div style="font-size: 16px; font-weight: 800;">${po.totalReceived} pcs</div>
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Total Returned</div>
+                <div style="font-size: 13px; font-weight: 800;">${po.totalReceived} pcs</div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Outstanding Balance</div>
-                <div style="font-size: 16px; font-weight: 800;">
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Outstanding Balance</div>
+                <div style="font-size: 13px; font-weight: 800;">
                   ${po.totalOrdered - po.totalReceived} pcs
                 </div>
               </div>
               <div>
-                <div style="font-size: 9px; text-transform: uppercase; font-weight: bold; margin-bottom: 4px; color: #000;">Return Ratio</div>
-                <div style="font-size: 16px; font-weight: 800;">
+                <div style="font-size: 8px; text-transform: uppercase; font-weight: bold; margin-bottom: 2px; color: #000;">Return Ratio</div>
+                <div style="font-size: 13px; font-weight: 800;">
                   ${percentage}%
                 </div>
               </div>
             </div>
+
+            ${approvalStatusHtml}
 
             <h3 style="font-size: 14px; margin-bottom: 12px; text-transform: uppercase; border-bottom: 2px solid #000;">1. MATERIAL ISSUE VS RETURN SUMMARY</h3>
             <table>
@@ -762,10 +829,7 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </div>
             `}
 
-            <div style="margin-top: 60px; display: flex; justify-content: space-between; font-size: 13px;">
-              <div style="text-align: center; width: 200px; border-top: 2px solid #000000; padding-top: 8px; font-weight: bold; color: #000;">Security Officer Signature</div>
-              <div style="text-align: center; width: 200px; border-top: 2px solid #000000; padding-top: 8px; font-weight: bold; color: #000;">Store In-Charge Signature</div>
-            </div>
+            ${rgpSignatureHtml}
             <script>window.onload = function() { window.print(); }</script>
           </body>
         </html>
@@ -807,6 +871,8 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
                 </tr>
               </tbody>
             </table>
+            ${approvalStatusHtml}
+            ${signatureHtml}
             <script>window.print();</script>
           </body>
         </html>

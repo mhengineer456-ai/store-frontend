@@ -1343,7 +1343,7 @@ export default function MaterialIssueView({
                 </div>
               </div>
 
-              <div className="custom-table-container" style={{ overflow: 'visible' }}>
+              <div className="custom-table-container">
                 <table className="custom-table" style={{ fontSize: '13px' }}>
                   <thead>
                     <tr>
