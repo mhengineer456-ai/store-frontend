@@ -1123,7 +1123,7 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
               </div>
             ) : captures.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)' }}>
-                No weighbridge captures exist in the database logs. Go to Weight Capture to log one.
+                No weighbridge captures exist in the database logs. Go to Material Add to log one.
               </div>
             ) : (
               captures.map((cap) => {
@@ -1496,7 +1496,7 @@ export default function POVerificationView({ currencySymbol = 'R', currentUser }
 
             {/* 2. Weight captures details */}
             <h4 style={{ margin: '0 0 10px 0', fontSize: '13.5px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              2. Individual Weight Capture Receipts
+              2. Individual Material Add Receipts
             </h4>
             <div className="table-responsive" style={{ border: '1.5px solid var(--border-color)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>

@@ -653,9 +653,9 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
       }}>
         {[
           { id: 'po', label: 'Standard PO', icon: <FileText size={16} /> },
-          { id: 'zip', label: 'Zip PO', icon: <Layers size={16} /> },
-          { id: 'dori', label: 'Dori PO', icon: <Scissors size={16} /> },
-          { id: 'rgp', label: 'Gate Pass (RGP)', icon: <Truck size={16} /> }
+          { id: 'zip', label: 'Zip Purcharge Orders', icon: <Layers size={16} /> },
+          { id: 'dori', label: 'Dori Purcharge Orders', icon: <Scissors size={16} /> },
+          { id: 'rgp', label: 'Returnable Gate Pass', icon: <Truck size={16} /> }
         ].map(tab => {
           const isActive = activeSubTab === tab.id;
           return (
@@ -1054,7 +1054,7 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
                             <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
                               <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>1</td>
                               <td style={{ padding: '10px 14px', fontWeight: '600' }}>
-                                Drawstrings (Dori PO Matrix)
+                                Drawstrings (Dori Purcharge Orders Matrix)
                                 <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-muted)', fontWeight: '400', marginTop: '2px' }}>
                                   Placements: {(() => {
                                     try {

@@ -2122,17 +2122,17 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
                               {isRgp && (
                                 <span style={{ backgroundColor: 'rgba(168, 85, 247, 0.15)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
-                                  RGP
+                                  Returnable Gate Pass
                                 </span>
                               )}
                               {hasZipPo && (
                                 <span style={{ backgroundColor: 'rgba(236, 72, 153, 0.15)', color: '#f472b6', border: '1px solid rgba(236, 72, 153, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
-                                  ZIP PO
+                                  Zip Purcharge Orders
                                 </span>
                               )}
                               {hasDoriPo && (
                                 <span style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 6px', borderRadius: '4px', fontSize: '9px', fontWeight: '700' }}>
-                                  DORI PO
+                                  Dori Purcharge Orders
                                 </span>
                               )}
                               {hasTrimPo && (

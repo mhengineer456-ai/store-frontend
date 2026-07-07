@@ -455,7 +455,7 @@ export default function DashboardView({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
             <h2 className="panel-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Scale size={18} style={{ color: 'var(--accent-color)' }} />
-              Weight Capture Transactions
+              Material Add Transactions
               <span style={{ fontSize: '11px', fontWeight: '600', background: 'var(--accent-light)', color: 'var(--accent-color)', borderRadius: '12px', padding: '2px 10px', marginLeft: '4px' }}>
                 {filteredWcTransactions.length} / {weightTransactions.length} entries
               </span>
@@ -520,7 +520,7 @@ export default function DashboardView({
               {filteredWcTransactions.length === 0 ? (
                 <tr>
                   <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px' }}>
-                    {weightTransactions.length === 0 ? 'No weight capture transactions found.' : 'No results for your search.'}
+                    {weightTransactions.length === 0 ? 'No material add transactions found.' : 'No results for your search.'}
                   </td>
                 </tr>
               ) : (

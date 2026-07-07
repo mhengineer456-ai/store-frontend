@@ -221,7 +221,7 @@ export default function ReportsHistoryView({
     (weightCaptures || []).forEach(wc => {
       list.push({
         id: `WC-${wc.id}`,
-        type: 'Weight Capture',
+        type: 'Material Add',
         date: wc.capturedAt,
         details: `Weighed ${wc.pieces || 0} pieces of ${wc.materialName || 'material'} (Net: ${wc.netWeightKg || 0} kg) for Lot #${wc.lotNo || '—'}`,
         operator: wc.storeIncharge || 'Weighbridge Operator',
@@ -398,7 +398,7 @@ export default function ReportsHistoryView({
       list.push({
         id: `ZIP-${z.Lot_Number}`,
         lotId: z.Lot_Number,
-        type: 'Zip PO',
+        type: 'Zip Purcharge Orders',
         tag: 'zip',
         supplier: z.Supplier_Name || '—',
         requestedQty: reqQty,
@@ -1049,10 +1049,10 @@ export default function ReportsHistoryView({
                                   {/* Zip POs */}
                                   <div style={{ background: 'var(--bg-secondary, #ffffff)', borderRadius: '8px', border: '1px solid var(--border-color)', padding: '12px', boxShadow: 'var(--shadow-sm)' }}>
                                     <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--accent-color)', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '4px', textTransform: 'uppercase' }}>
-                                      ⚡ Zip POs ({detailData.zips.length})
+                                      ⚡ Zip Purcharge Orders ({detailData.zips.length})
                                     </span>
                                     {detailData.zips.length === 0 ? (
-                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No Zip POs generated.</span>
+                                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No Zip Purcharge Orders generated.</span>
                                     ) : (
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         {detailData.zips.map((z, zIdx) => (
@@ -1139,7 +1139,7 @@ export default function ReportsHistoryView({
                 <option value="issue">Issues</option>
                 <option value="return">Returns</option>
                 <option value="transfer">Transfers</option>
-                <option value="weight">Weight Captures</option>
+                <option value="weight">Material Add</option>
               </select>
               <select
                 value={saDateFilter}
@@ -1362,9 +1362,9 @@ export default function ReportsHistoryView({
               >
                 <option value="all">All PO Types</option>
                 <option value="normal">Normal PO</option>
-                <option value="zip">Zip PO</option>
+                <option value="zip">Zip Purcharge Orders</option>
                 <option value="doori">Doori PO</option>
-                <option value="rgp">RGP PO</option>
+                <option value="rgp">Returnable Gate Pass</option>
               </select>
               <select
                 value={ptStatusFilter}

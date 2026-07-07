@@ -3299,7 +3299,7 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
                         margin: '0 0 10px 0',
                         letterSpacing: '-0.8px'
                     }}>
-                        Zip PO Generator
+                        Zip Purcharge Orders Generator
                     </h1>
                     <p style={{
                         color: 'var(--text-muted)',
@@ -3390,7 +3390,7 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
                                 alignItems: 'center',
                                 gap: '8px'
                             }}>
-                                <FiCheckSquare size={14} style={{ color: 'var(--success)' }} /> Approved Designs Ready for Zip PO
+                                <FiCheckSquare size={14} style={{ color: 'var(--success)' }} /> Approved Designs Ready for Zip Purcharge Orders
                             </h3>
                             <div style={{
                                 display: 'grid',
@@ -4043,7 +4043,7 @@ export default function PuneetZip({ prefilledLotNo = '', setPrefilledLotNo = () 
     const tabs = [
         {
             id: 'zip',
-            label: 'Zip PO',
+            label: 'Zip Purcharge Orders',
             subtitle: 'Generate zipper order sheets',
             gradient: 'linear-gradient(135deg, #7c3aed, #a855f7)',
             glow: 'rgba(124, 58, 237, 0.25)',
@@ -4051,7 +4051,7 @@ export default function PuneetZip({ prefilledLotNo = '', setPrefilledLotNo = () 
         },
         {
             id: 'dori',
-            label: 'Dori PO',
+            label: 'Dori Purcharge Orders',
             subtitle: 'Generate drawstring order sheets',
             gradient: 'linear-gradient(135deg, #d97706, #f59e0b)',
             glow: 'rgba(217, 119, 6, 0.25)',
@@ -4489,7 +4489,7 @@ export function ZipDashboard({ onCompileNewPO }) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '100px 20px', background: '#f8fafc', minHeight: '60vh' }}>
                 <div className="Spinner" style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #7c3aed', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                <p style={{ marginTop: '16px', color: '#64748b', fontSize: '15px', fontWeight: '500' }}>Loading Zip PO Dashboard data...</p>
+                <p style={{ marginTop: '16px', color: '#64748b', fontSize: '15px', fontWeight: '500' }}>Loading Zip Purcharge Orders Dashboard data...</p>
             </div>
         );
     }

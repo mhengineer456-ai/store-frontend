@@ -427,15 +427,15 @@ export default function App() {
   useEffect(() => {
     const pageTitles = {
       dashboard: 'Dashboard',
-      design: 'Spec Sheet',
-      material_verification: 'Verification',
-      rgp: 'RGP',
-      zip_po: 'Zip PO',
-      dori_po: 'Dori PO',
+      design: 'Below of Material',
+      material_verification: 'Stock Accessories',
+      rgp: 'Returnable Gate Pass',
+      zip_po: 'Zip Purcharge Orders',
+      dori_po: 'Dori Purcharge Orders',
       generate_po: 'Generate PO',
-      history: 'Lot Workflow',
+      history: 'Production Work',
       scanner_logs: 'Scanner Log',
-      weight_capture: 'Weight Capture',
+      weight_capture: 'Material Add',
       material_issue: 'Material Issue',
       return_material: 'Return Material',
       material_details: 'Material Detail',
@@ -1508,8 +1508,8 @@ export default function App() {
             <Layers3 size={28} style={{ color: 'var(--accent-color)' }} />
             <span className="sidebar-logo-text">MH STORE</span>
           </div>
-          <button 
-            className="mobile-sidebar-close" 
+          <button
+            className="mobile-sidebar-close"
             onClick={() => setIsSidebarOpen(false)}
             style={{
               background: 'transparent',
@@ -1552,25 +1552,25 @@ export default function App() {
                 {adminDesignMenuOpen && (
                   <ul className="sidebar-submenu">
                     <li className={`sidebar-subitem ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>
-                      <span className="sidebar-text">Spec Sheet</span>
+                      <span className="sidebar-text">Below of Material</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'material_verification' ? 'active' : ''}`} onClick={() => setActiveTab('material_verification')}>
-                      <span className="sidebar-text">Verification</span>
+                      <span className="sidebar-text">Stock Accessories</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'rgp' ? 'active' : ''}`} onClick={() => setActiveTab('rgp')}>
-                      <span className="sidebar-text">RGP</span>
+                      <span className="sidebar-text">Returnable Gate Pass</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'zip_po' ? 'active' : ''}`} onClick={() => { setActiveTab('zip_po'); setPrefilledPoType('zip'); }}>
-                      <span className="sidebar-text">Zip PO</span>
+                      <span className="sidebar-text">Zip Purcharge Orders</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'dori_po' ? 'active' : ''}`} onClick={() => { setActiveTab('dori_po'); setPrefilledPoType('dori'); }}>
-                      <span className="sidebar-text">Dori PO</span>
+                      <span className="sidebar-text">Dori Purcharge Orders</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'generate_po' ? 'active' : ''}`} onClick={() => setActiveTab('generate_po')}>
                       <span className="sidebar-text">Generate PO</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-                      <span className="sidebar-text">Lot Workflow</span>
+                      <span className="sidebar-text">Production Work</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
                       <span className="sidebar-text">Scanner Log</span>
@@ -1597,7 +1597,7 @@ export default function App() {
                 {adminStoreMenuOpen && (
                   <ul className="sidebar-submenu">
                     <li className={`sidebar-subitem ${activeTab === 'weight_capture' ? 'active' : ''}`} onClick={() => setActiveTab('weight_capture')}>
-                      <span className="sidebar-text">Weight Capture</span>
+                      <span className="sidebar-text">Material Add</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'material_issue' ? 'active' : ''}`} onClick={() => setActiveTab('material_issue')}>
                       <span className="sidebar-text">Material Issue</span>
@@ -1612,7 +1612,7 @@ export default function App() {
                       <span className="sidebar-text">Material Transfer</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-                      <span className="sidebar-text">Lot Workflow</span>
+                      <span className="sidebar-text">Production Work</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
                       <span className="sidebar-text">Scanner Log</span>
@@ -1630,23 +1630,23 @@ export default function App() {
               <>
                 <li className={`sidebar-item ${activeTab === 'design' ? 'active' : ''}`} onClick={() => setActiveTab('design')}>
                   <Scissors size={18} />
-                  <span className="sidebar-text">Spec Sheet</span>
+                  <span className="sidebar-text">Below of Material</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'material_verification' ? 'active' : ''}`} onClick={() => setActiveTab('material_verification')}>
                   <CheckSquare size={18} />
-                  <span className="sidebar-text">Verification</span>
+                  <span className="sidebar-text">Stock Accessories</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'rgp' ? 'active' : ''}`} onClick={() => setActiveTab('rgp')}>
                   <Truck size={18} />
-                  <span className="sidebar-text">RGP</span>
+                  <span className="sidebar-text">Returnable Gate Pass</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'zip_po' ? 'active' : ''}`} onClick={() => { setActiveTab('zip_po'); setPrefilledPoType('zip'); }}>
                   <FileText size={18} />
-                  <span className="sidebar-text">Zip PO</span>
+                  <span className="sidebar-text">Zip Purcharge Orders</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'dori_po' ? 'active' : ''}`} onClick={() => { setActiveTab('dori_po'); setPrefilledPoType('dori'); }}>
                   <FileText size={18} />
-                  <span className="sidebar-text">Dori PO</span>
+                  <span className="sidebar-text">Dori Purcharge Orders</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'generate_po' ? 'active' : ''}`} onClick={() => setActiveTab('generate_po')}>
                   <FileText size={18} />
@@ -1654,7 +1654,7 @@ export default function App() {
                 </li>
                 <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                   <History size={18} />
-                  <span className="sidebar-text">Lot Workflow</span>
+                  <span className="sidebar-text">Production Work</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
                   <QrCode size={18} />
@@ -1685,8 +1685,8 @@ export default function App() {
             {currentUser?.role !== 'Admin' && getRolePanel(currentUser?.role) === 'store' && (
               <>
                 <li className={`sidebar-item ${activeTab === 'weight_capture' ? 'active' : ''}`} onClick={() => setActiveTab('weight_capture')}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                  <span className="sidebar-text">Weight Capture</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg>
+                  <span className="sidebar-text">Material Add</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'material_issue' ? 'active' : ''}`} onClick={() => setActiveTab('material_issue')}>
                   <ClipboardList size={18} />
@@ -1706,7 +1706,7 @@ export default function App() {
                 </li>
                 <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                   <History size={18} />
-                  <span className="sidebar-text">Lot Workflow</span>
+                  <span className="sidebar-text">Production Work</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'scanner_logs' ? 'active' : ''}`} onClick={() => setActiveTab('scanner_logs')}>
                   <QrCode size={18} />
@@ -1746,7 +1746,7 @@ export default function App() {
                 </li>
                 <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                   <History size={18} />
-                  <span className="sidebar-text">Lot Workflow</span>
+                  <span className="sidebar-text">Production Work</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'approval_queue' ? 'active' : ''}`} onClick={() => setActiveTab('approval_queue')} style={{ position: 'relative' }}>
                   <Shield size={18} />
@@ -1792,7 +1792,7 @@ export default function App() {
       <main className="main-content">
         {/* Top Header */}
         <header className="top-header">
-          <button 
+          <button
             className="mobile-menu-toggle"
             onClick={() => setIsSidebarOpen(true)}
             style={{
@@ -1808,15 +1808,15 @@ export default function App() {
           <div className="header-title-container">
             <h1>
               {activeTab === 'dashboard' && 'Dashboard Overview'}
-              {activeTab === 'design' && 'Spec Sheet'}
-              {activeTab === 'material_verification' && 'Verification'}
-              {activeTab === 'rgp' && 'RGP'}
-              {activeTab === 'zip_po' && 'Zip PO'}
-              {activeTab === 'dori_po' && 'Dori PO'}
+              {activeTab === 'design' && 'Below of Material'}
+              {activeTab === 'material_verification' && 'Stock Accessories'}
+              {activeTab === 'rgp' && 'Returnable Gate Pass'}
+              {activeTab === 'zip_po' && 'Zip Purcharge Orders'}
+              {activeTab === 'dori_po' && 'Dori Purcharge Orders'}
               {activeTab === 'generate_po' && 'Generate PO'}
-              {activeTab === 'history' && 'Lot Workflow'}
+              {activeTab === 'history' && 'Production Work'}
               {activeTab === 'scanner_logs' && 'Scanner Log'}
-              {activeTab === 'weight_capture' && 'Weight Capture'}
+              {activeTab === 'weight_capture' && 'Material Add'}
               {activeTab === 'material_issue' && 'Material Issue'}
               {activeTab === 'return_material' && 'Return Material'}
               {activeTab === 'material_details' && 'Material Detail'}

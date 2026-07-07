@@ -691,7 +691,7 @@ export default function WeightCapture() {
             <Scale size={22} />
           </div>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>Weight Capture Station</h2>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>Material Add</h2>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Digital Counting Weighbridge Interface</span>
           </div>
         </div>
@@ -1325,7 +1325,7 @@ export default function WeightCapture() {
                   e.currentTarget.style.boxShadow = '0 4px 14px rgba(16, 185, 129, 0.35)';
                 }}
               >
-                <CheckCircle2 size={19} /> Save & Print Weight Capture
+                <CheckCircle2 size={19} /> Save & Print Material Add
               </button>
             </div>
           </div>

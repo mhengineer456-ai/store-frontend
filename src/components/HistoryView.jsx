@@ -363,7 +363,7 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
       } catch (_) { }
       events.push({
         type: 'zip_po_created',
-        title: `Zip PO Compiled${zipPoNum ? ` — ${zipPoNum}` : ''}`,
+        title: `Zip Purcharge Orders Compiled${zipPoNum ? ` — ${zipPoNum}` : ''}`,
         timestamp: formatDateTime(zipTime) || 'Processed',
         dateObj: parseToDateObject(zipTime),
         actor: matchingZipOrder.Supervisor || 'Storekeeper',
@@ -743,11 +743,11 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
             <div><strong>Supplier:</strong> {rgpScans[0]?.supplier_name || 'N/A'}</div>
             <div><strong>Material:</strong> {rgpScans[0]?.material_name || 'N/A'}</div>
           </div>
-        ) : <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>RGP dispatch has not been logged.</span>
+        ) : <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Returnable Gate Pass dispatch has not been logged.</span>
       },
       {
         id: 'zip',
-        name: `Zip PO — Zipper Selection${zipPoNum ? ` (${zipPoNum})` : ''}`,
+        name: `Zip Purcharge Orders — Zipper Selection${zipPoNum ? ` (${zipPoNum})` : ''}`,
         isComplete: zipCompiled,
         date: zipDate,
         actor: zipActor,
@@ -765,7 +765,7 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
       },
       {
         id: 'doori',
-        name: `Dori PO — Thread / Drawstring${doriPoNum ? ` (${doriPoNum})` : ''}`,
+        name: `Dori Purcharge Orders — Thread / Drawstring${doriPoNum ? ` (${doriPoNum})` : ''}`,
         isComplete: dooriReleased,
         date: dooriDate,
         actor: dooriActor,
@@ -965,8 +965,8 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
   return (
     <div className="animate-fade">
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontFamily: 'var(--font-family-title)', fontSize: '22px', fontWeight: '700' }}>Lot Workflow History</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Compile the complete operational history of a design lot (registration, approvals, PO creations, fabric RGPs, gate check-ins, and store receipts).</p>
+        <h2 style={{ fontFamily: 'var(--font-family-title)', fontSize: '22px', fontWeight: '700' }}>Production Work History</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Compile the complete operational history of a design lot (registration, approvals, PO creations, returnable gate pass, gate check-ins, and store receipts).</p>
       </div>
 
       {errorMessage && (
@@ -1206,7 +1206,7 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
                   </div>
                   <div>
                     <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '800', color: 'var(--text-main)' }}>
-                      Lot Workflow Status: {allComplete ? 'Complete' : 'In Progress'}
+                      Production Work Status: {allComplete ? 'Complete' : 'In Progress'}
                     </h4>
                     <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
                       {allComplete

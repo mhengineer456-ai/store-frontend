@@ -324,7 +324,7 @@ export default function MaterialVerificationView({
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 style={{ fontFamily: 'var(--font-family-title)', fontSize: '22px', fontWeight: '700' }}>Material Verification Panel</h2>
+          <h2 style={{ fontFamily: 'var(--font-family-title)', fontSize: '22px', fontWeight: '700' }}>Stock Accessories Panel</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
           </p>
         </div>
@@ -353,7 +353,7 @@ export default function MaterialVerificationView({
         <div className="panel-header">
           <h3 className="panel-title">
             <CheckSquare size={18} className="text-accent" />
-            Lot Verification Settings
+            Stock Accessories Settings
           </h3>
         </div>
 
@@ -520,7 +520,7 @@ export default function MaterialVerificationView({
         {!selectedDesign ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '220px', color: 'var(--text-muted)', textAlign: 'center' }}>
             <HelpCircle size={48} strokeWidth={1} style={{ marginBottom: '12px' }} />
-            <p style={{ fontSize: '14px', fontWeight: '500' }}>Select an approved design lot above to analyze verification data.</p>
+            <p style={{ fontSize: '14px', fontWeight: '500' }}>Select an approved design lot above to analyze stock accessories data.</p>
           </div>
         ) : (
           <div>

@@ -3338,7 +3338,7 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
                         margin: '0 0 10px 0',
                         letterSpacing: '-0.8px'
                     }}>
-                        Dori PO Generator
+                        Dori Purcharge Orders Generator
                     </h1>
                     <p style={{
                         color: 'var(--text-muted)',
@@ -3429,7 +3429,7 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
                                 alignItems: 'center',
                                 gap: '8px'
                             }}>
-                                <FiCheckSquare size={14} style={{ color: 'var(--success)' }} /> Approved Designs Ready for Dori PO
+                                <FiCheckSquare size={14} style={{ color: 'var(--success)' }} /> Approved Designs Ready for Dori Purcharge Orders
                             </h3>
                             <div style={{
                                 display: 'grid',
@@ -4343,7 +4343,7 @@ export function DoriDashboard({ onCompileNewPO }) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '100px 20px', background: '#f8fafc', minHeight: '60vh' }}>
                 <div className="Spinner" style={{ width: '40px', height: '40px', border: '4px solid #f3f3f3', borderTop: '4px solid #d97706', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-                <p style={{ marginTop: '16px', color: '#64748b', fontSize: '15px', fontWeight: '500' }}>Loading Dori PO Dashboard data...</p>
+                <p style={{ marginTop: '16px', color: '#64748b', fontSize: '15px', fontWeight: '500' }}>Loading Dori Purcharge Orders Dashboard data...</p>
             </div>
         );
     }

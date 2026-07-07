@@ -196,7 +196,7 @@ export default function SettingsView({
             </div>
             
             <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '12px' }}>
-              Define the default catalog of garment accessories. These will automatically appear as options in the Tech Spec Sheet builder checklist.
+              Define the default catalog of garment accessories. These will automatically appear as options in the Below of Material builder checklist.
             </p>
 
             <div style={{ 
@@ -285,7 +285,7 @@ export default function SettingsView({
             </div>
             
             <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '12px' }}>
-              Manage system designer names. These options will populate the Designer In-charge dropdown in the Spec sheet form.
+              Manage system designer names. These options will populate the Designer In-charge dropdown in the Below of Material form.
             </p>
 
             <div style={{ 
