@@ -19,6 +19,7 @@ export default function ApprovalQueueView({
   const [filterStatus, setFilterStatus] = useState('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [printRequest, setPrintRequest] = useState(null);
 
   // Extra filter states matching the new UI mockup
   const [filterDate, setFilterDate] = useState('all');
@@ -71,7 +72,7 @@ export default function ApprovalQueueView({
     if (n.includes('label') || n.includes('sticker') || n.includes('satin')) {
       return 'https://images.unsplash.com/photo-1520004481444-76649034b3e3?auto=format&fit=crop&w=150&q=80';
     }
-    return 'https://images.unsplash.com/photo-1558769132-cb1aea458c5e?auto=format&fit=crop&w=150&q=80'; // Fallback
+    return 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTfSpxz49Egc7TT1a8a5jMmmupv9ML64rFXYH2Y0ovpDA&s=10'; // Fallback
   };
 
   const getRequestImage = (req) => {
@@ -158,30 +159,30 @@ export default function ApprovalQueueView({
     const subStr = formatRequestDate(req.date);
     let underReviewStr = 'Pending';
     let resolvedStr = '';
-let resolvedActor = 'Admin';
-    
+    let resolvedActor = 'Admin';
+
     if (req.status !== 'pending') {
       try {
         const parts = req.date.split(' ');
         if (parts.length >= 2) {
           const timeParts = parts[1].split(':');
           let hour = parseInt(timeParts[0], 10);
-let minute = parseInt(timeParts[1], 10);
-          
+          let minute = parseInt(timeParts[1], 10);
+
           let reviewMin = minute + 4;
           let reviewHour = hour;
           if (reviewMin >= 60) {
             reviewMin -= 60;
             reviewHour = (reviewHour + 1) % 24;
-}
-          
+          }
+
           let resMin = reviewMin + 5;
           let resHour = reviewHour;
           if (resMin >= 60) {
             resMin -= 60;
             resHour = (resHour + 1) % 24;
-}
-          
+          }
+
           const formatSimulated = (h, m) => {
             const datePart = parts[0];
             const dateSubparts = datePart.split('/');
@@ -196,8 +197,8 @@ let minute = parseInt(timeParts[1], 10);
             const formattedHStr = formattedH < 10 ? '0' + formattedH : formattedH;
             const formattedMStr = m < 10 ? '0' + m : m;
             return `${formattedDay} ${monthName} ${year}, ${formattedHStr}:${formattedMStr} ${ampm}`;
-};
-          
+          };
+
           underReviewStr = formatSimulated(reviewHour, reviewMin);
           resolvedStr = formatSimulated(resHour, resMin);
         } else {
@@ -208,11 +209,11 @@ let minute = parseInt(timeParts[1], 10);
         underReviewStr = subStr;
         resolvedStr = subStr;
       }
-}
-    
+    }
+
     if (req.resolvedDate && req.status !== 'pending') {
       if (req.resolvedDate.includes(' by ')) {
-    const parts = req.resolvedDate.split(' by ');
+        const parts = req.resolvedDate.split(' by ');
         resolvedStr = formatRequestDate(parts[0]);
         resolvedActor = parts[1];
       } else {
@@ -220,7 +221,7 @@ let minute = parseInt(timeParts[1], 10);
         resolvedActor = 'Admin';
       }
     }
-  
+
     return {
       submitted: subStr,
       underReview: underReviewStr,
@@ -277,11 +278,15 @@ let minute = parseInt(timeParts[1], 10);
   };
 
   const handleDownloadPDF = (req) => {
+    setPrintRequest(req);
     setLocalToast({ message: `Compiling and downloading PDF for Request #${req.id}...`, type: 'success' });
+    document.body.classList.add('print-approval-request-mode');
     setTimeout(() => {
       window.print();
+      document.body.classList.remove('print-approval-request-mode');
+      setPrintRequest(null);
       setLocalToast(null);
-    }, 1000);
+    }, 150);
   };
 
   const handleRefreshQueue = () => {
@@ -291,7 +296,7 @@ let minute = parseInt(timeParts[1], 10);
       const d = new Date();
       const day = d.getDate();
       const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()];
-const year = d.getFullYear();
+      const year = d.getFullYear();
       let hour = d.getHours();
       const minute = d.getMinutes();
       const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -300,81 +305,81 @@ const year = d.getFullYear();
       const formattedDay = day < 10 ? '0' + day : day;
       const formattedHour = hour < 10 ? '0' + hour : hour;
       const formattedMinute = minute < 10 ? '0' + minute : minute;
-    
+
       setLastUpdated(`${formattedDay} ${monthName} ${year}, ${formattedHour}:${formattedMinute} ${ampm}`);
       setLocalToast({ message: 'Database query successfully refreshed.', type: 'success' });
       setTimeout(() => setLocalToast(null), 3000);
     }, 800);
   };
-  
+
   const handleResetFilters = () => {
-  setFilterStatus('pending');
+    setFilterStatus('pending');
     setFilterType('all');
-  setSearchQuery('');
-  setFilterDate('all');
-  setFilterUser('all');
-  setSortBy('newest');
+    setSearchQuery('');
+    setFilterDate('all');
+    setFilterUser('all');
+    setSortBy('newest');
 
-  setLocalToast({ message: 'All filters successfully reset.', type: 'success' });
-  setTimeout(() => setLocalToast(null), 3000);
-};
+    setLocalToast({ message: 'All filters successfully reset.', type: 'success' });
+    setTimeout(() => setLocalToast(null), 3000);
+  };
 
-// Filter conditions
-const filteredRequests = userRequests.filter(req => {
-// 1. Status Filter
-const matchesStatus = filterStatus === 'all' ? true : req.status === filterStatus;
+  // Filter conditions
+  const filteredRequests = userRequests.filter(req => {
+    // 1. Status Filter
+    const matchesStatus = filterStatus === 'all' ? true : req.status === filterStatus;
 
     // 2. Type Filter
     const matchesType = filterType === 'all' ? true : req.type === filterType;
-  
+
     // 3. User Filter
     const matchesUser = filterUser === 'all' ? true : req.requesterName === filterUser;
-  
-  // 4. Date Range Filter
-  let matchesDate = true;
-  if (filterDate !== 'all') {
-    try {
-  const parts = req.date.split(' ')[0].split('/');
-    const reqDate = new Date(parts[2], parts[1] - 1, parts[0]);
-  const today = new Date();
+
+    // 4. Date Range Filter
+    let matchesDate = true;
+    if (filterDate !== 'all') {
+      try {
+        const parts = req.date.split(' ')[0].split('/');
+        const reqDate = new Date(parts[2], parts[1] - 1, parts[0]);
+        const today = new Date();
         const diffTime = Math.abs(today - reqDate);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  if (filterDate === 'today') {
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (filterDate === 'today') {
           matchesDate = diffDays <= 1;
-    } else if (filterDate === 'week') {
-      matchesDate = diffDays <= 7;
-    } else if (filterDate === 'month') {
-      matchesDate = diffDays <= 30;
-    }
-  } catch {
-    matchesDate = true;
-  }
+        } else if (filterDate === 'week') {
+          matchesDate = diffDays <= 7;
+        } else if (filterDate === 'month') {
+          matchesDate = diffDays <= 30;
+        }
+      } catch {
+        matchesDate = true;
+      }
     }
 
-// 5. Search text query
+    // 5. Search text query
     const q = searchQuery.toLowerCase();
     const matchesSearch = !q ||
-    (req.requesterName || '').toLowerCase().includes(q) ||
-    (req.lotId || '').toLowerCase().includes(q) ||
-    (req.materialName || '').toLowerCase().includes(q) ||
-    (req.materialId || '').toLowerCase().includes(q) ||
+      (req.requesterName || '').toLowerCase().includes(q) ||
+      (req.lotId || '').toLowerCase().includes(q) ||
+      (req.materialName || '').toLowerCase().includes(q) ||
+      (req.materialId || '').toLowerCase().includes(q) ||
       (req.id || '').toLowerCase().includes(q);
-      
+
     return matchesStatus && matchesType && matchesUser && matchesDate && matchesSearch;
-    }); 
+  });
 
   // Sort logic
   const sortedRequests = [...filteredRequests].sort((a, b) => {
     try {
       const parseDate = (dStr) => {
-    const parts = dStr.split(' ');
-    const dateParts = parts[0].split('/');
+        const parts = dStr.split(' ');
+        const dateParts = parts[0].split('/');
         const timeParts = parts[1].split(':');
         return new Date(dateParts[2], dateParts[1] - 1, dateParts[0], timeParts[0], timeParts[1]);
-    };
-    const dateA = parseDate(a.date);
-    const dateB = parseDate(b.date);
-    return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
+      };
+      const dateA = parseDate(a.date);
+      const dateB = parseDate(b.date);
+      return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
     } catch {
       return sortBy === 'newest' ? b.id.localeCompare(a.id) : a.id.localeCompare(b.id);
     }
@@ -1433,15 +1438,15 @@ const matchesStatus = filterStatus === 'all' ? true : req.status === filterStatu
                       {req.type === 'material_issue'
                         ? (req.isReissue ? 'Re-Issue Request' : 'Issue Request')
                         : req.type === 'design_verification'
-                        ? 'Design Verification'
-                        : 'Delete Request'}
+                          ? 'Design Verification'
+                          : 'Delete Request'}
                     </span>
                     <h4 className="card-item-title">
                       {req.type === 'material_issue'
                         ? (req.isReissue ? `Material Re-Issue — Lot ${req.lotId}` : `Material Issue — Lot ${req.lotId}`)
                         : req.type === 'design_verification'
-                        ? `Design Verification — Lot ${req.lotId}`
-                        : req.materialName}
+                          ? `Design Verification — Lot ${req.lotId}`
+                          : req.materialName}
                     </h4>
                     <div className="card-pills-row">
                       <span className="card-pill-tag code-tag">{matDetails.materialId}</span>
@@ -1756,6 +1761,137 @@ const matchesStatus = filterStatus === 'all' ? true : req.status === filterStatu
               >
                 Confirm
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden print layout — only visible during print media */}
+      {printRequest && (
+        <div className="approval-request-print-layout">
+          {/* Slip header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #000', paddingBottom: '10px', marginBottom: '14px' }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px' }}>MH ACCESSORIES & BOM</h2>
+              <span style={{ fontSize: '11px', color: '#555' }}>Premium Garment Production Management System</span>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                {printRequest.type === 'material_issue' ? 'Material Requisition & Issue Slip' :
+                  printRequest.type === 'design_verification' ? 'Design Verification Requisition' :
+                    'Material Deletion Authorization'}
+              </h3>
+              <span style={{ fontSize: '11px', fontWeight: 'bold' }}>Request ID: #{printRequest.id}</span>
+            </div>
+          </div>
+
+          {/* Info grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 20px', padding: '12px', border: '1px solid #000', borderRadius: '4px', marginBottom: '16px', fontSize: '12px' }}>
+            <div><strong>Request Type:</strong> {printRequest.type === 'material_issue' ? 'Material Issue' : printRequest.type === 'design_verification' ? 'Design Verification' : 'Material Deletion'}</div>
+            <div><strong>Status:</strong> {printRequest.status.toUpperCase()}</div>
+            <div><strong>Lot Number:</strong> Lot {printRequest.lotId || 'N/A'}</div>
+            <div><strong>Submitted Date:</strong> {printRequest.date}</div>
+            <div><strong>Requested By:</strong> {printRequest.requesterName}</div>
+            {printRequest.resolvedDate && (
+              <div><strong>Approved/Resolved Date:</strong> {printRequest.resolvedDate}</div>
+            )}
+            {printRequest.materialName && (
+              <div><strong>Material Mapped:</strong> {printRequest.materialName} ({printRequest.materialId})</div>
+            )}
+          </div>
+
+          {/* Reason Box */}
+          <div style={{ marginBottom: '16px', fontSize: '12px' }}>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid #000', paddingBottom: '3px' }}>Justification / Reason</h4>
+            <p style={{ margin: 0, fontStyle: 'italic', color: '#333' }}>
+              {printRequest.reason ? `"${printRequest.reason}"` : 'No justification details provided.'}
+            </p>
+            {printRequest.status === 'rejected' && printRequest.rejectionReason && (
+              <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '4px' }}>
+                <strong style={{ color: '#dc2626' }}>Rejection Reason:</strong> <span style={{ color: '#dc2626' }}>{printRequest.rejectionReason}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Items / Details Table */}
+          {printRequest.type === 'material_issue' && printRequest.items && printRequest.items.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid #000', paddingBottom: '3px' }}>Components to Issue</h4>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #000', backgroundColor: '#f3f4f6' }}>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>BOM Component</th>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>Inventory Material Map</th>
+                    <th style={{ textAlign: 'right', padding: '6px' }}>Total Required</th>
+                    <th style={{ textAlign: 'left', padding: '6px', paddingLeft: '12px' }}>Unit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {printRequest.items.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '6px' }}>{idx + 1}</td>
+                      <td style={{ padding: '6px', fontWeight: '600' }}>{item.bomItemName}</td>
+                      <td style={{ padding: '6px', color: '#4b5563' }}>{item.materialName}</td>
+                      <td style={{ padding: '6px', textAlign: 'right', fontWeight: 'bold' }}>{item.totalRequired}</td>
+                      <td style={{ padding: '6px', paddingLeft: '12px', color: '#4b5563' }}>{item.unit}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {printRequest.type === 'design_verification' && (
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ margin: '0 0 6px 0', fontSize: '12px', textTransform: 'uppercase', borderBottom: '1px solid #000', paddingBottom: '3px' }}>Bill of Materials (BOM) Checklist</h4>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #000', backgroundColor: '#f3f4f6' }}>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>#</th>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>Component Name</th>
+                    <th style={{ textAlign: 'center', padding: '6px' }}>Required Status</th>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>Qty/Piece</th>
+                    <th style={{ textAlign: 'left', padding: '6px' }}>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const design = designs.find(d => String(d.id) === String(printRequest.lotId));
+                    const bomList = design?.bom || [];
+                    if (bomList.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '12px', color: '#6b7280' }}>No BOM components configured.</td>
+                        </tr>
+                      );
+                    }
+                    return bomList.map((item, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '6px' }}>{idx + 1}</td>
+                        <td style={{ padding: '6px', fontWeight: '600' }}>{item.name}</td>
+                        <td style={{ padding: '6px', textAlign: 'center' }}>{item.status || 'No'}</td>
+                        <td style={{ padding: '6px', fontWeight: 'bold' }}>{item.detail || '—'}</td>
+                        <td style={{ padding: '6px', color: '#4b5563' }}>{item.description || '—'}</td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Signatures */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '60px', fontSize: '12px' }}>
+            <div style={{ width: '40%', borderTop: '1px solid #000', textAlign: 'center', paddingTop: '6px' }}>
+              <strong>Requested By</strong>
+              <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{printRequest.requesterName}</div>
+            </div>
+            <div style={{ width: '40%', borderTop: '1px solid #000', textAlign: 'center', paddingTop: '6px' }}>
+              <strong>Authorized Signatory (Admin)</strong>
+              <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>
+                {printRequest.resolvedDate ? (printRequest.resolvedDate.includes(' by ') ? printRequest.resolvedDate.split(' by ')[1] : 'Admin') : '________________'}
+              </div>
             </div>
           </div>
         </div>

@@ -30,6 +30,7 @@ import ReDownloadView from './components/ReDownloadView';
 import WeightCapture from './components/WeightCapture';
 import MaterialTransferView from './components/MaterialTransferView';
 import POVerificationView from './components/POVerificationView';
+import WarehouseLocationView from './components/WarehouseLocationView';
 
 // Default Mock Data Arrays
 const initialMaterials = [
@@ -224,6 +225,7 @@ const hasTabAccess = (tabName, role) => {
       'return_material',
       'material_details',
       'material_transfer',
+      'warehouse_locations',
       'reports_history',
       'settings',
       'approval_queue',
@@ -242,6 +244,7 @@ const hasTabAccess = (tabName, role) => {
       'history',
       'scanner_logs',
       'po_verification',
+      'warehouse_locations',
       'approval_queue'
     ].includes(tabName);
   }
@@ -253,10 +256,13 @@ const hasTabAccess = (tabName, role) => {
       'return_material',
       'material_details',
       'material_transfer',
+      'warehouse_locations',
       'history',
       'scanner_logs',
       'po_verification',
-      'approval_queue'
+      'approval_queue',
+      'rgp',
+      'generate_po'
     ].includes(tabName);
   }
   return false;
@@ -344,6 +350,20 @@ export default function App() {
   const [pos, setPOs] = useState(initialPOs);
   // Vendors — backed by database
   const [vendors, setVendors] = useState(initialVendors);
+
+  // Warehouse Racks configuration state
+  const [racks, setRacks] = useState(() => {
+    const saved = localStorage.getItem('warehouse_racks');
+    return saved ? JSON.parse(saved) : [
+      { id: '1', code: 'A', name: 'Rack A', shelves: 3, levels: 2, warehouse: 'Main Warehouse' },
+      { id: '2', code: 'B', name: 'Rack B', shelves: 3, levels: 2, warehouse: 'Main Warehouse' },
+      { id: '3', code: 'C', name: 'Rack C', shelves: 3, levels: 2, warehouse: 'Dyeing Store' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('warehouse_racks', JSON.stringify(racks));
+  }, [racks]);
 
   // Accessories & designers — backed by database (settings table)
   const [accessoriesList, setAccessoriesList] = useState([
@@ -440,6 +460,7 @@ export default function App() {
       return_material: 'Return Material',
       material_details: 'Material Detail',
       material_transfer: 'Material Transfer',
+      warehouse_locations: 'Warehouse Locations',
       reports_history: 'Report and History',
       settings: 'Setting',
       approval_queue: currentUser?.role === 'Admin' ? 'Approval Queue' : 'My Requests'
@@ -1591,7 +1612,7 @@ export default function App() {
             {currentUser?.role === 'Admin' && (
               <>
                 <li
-                  className={`sidebar-item ${['weight_capture', 'material_issue', 'return_material', 'material_details', 'material_transfer', 'history', 'scanner_logs'].includes(activeTab) && activeTab !== 'history' ? 'active' : ''}`}
+                  className={`sidebar-item ${['weight_capture', 'material_issue', 'return_material', 'material_details', 'material_transfer', 'warehouse_locations', 'history', 'scanner_logs', 'po_verification', 'rgp', 'generate_po'].includes(activeTab) && activeTab !== 'history' ? 'active' : ''}`}
                   onClick={() => setAdminStoreMenuOpen(!adminStoreMenuOpen)}
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
@@ -1617,6 +1638,15 @@ export default function App() {
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'material_transfer' ? 'active' : ''}`} onClick={() => setActiveTab('material_transfer')}>
                       <span className="sidebar-text">Material Transfer</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'warehouse_locations' ? 'active' : ''}`} onClick={() => setActiveTab('warehouse_locations')}>
+                      <span className="sidebar-text">Warehouse Locations</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'rgp' ? 'active' : ''}`} onClick={() => setActiveTab('rgp')}>
+                      <span className="sidebar-text">Returnable Gate Pass</span>
+                    </li>
+                    <li className={`sidebar-subitem ${activeTab === 'generate_po' ? 'active' : ''}`} onClick={() => setActiveTab('generate_po')}>
+                      <span className="sidebar-text">Generate PO</span>
                     </li>
                     <li className={`sidebar-subitem ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                       <span className="sidebar-text">Production Work</span>
@@ -1710,6 +1740,18 @@ export default function App() {
                 <li className={`sidebar-item ${activeTab === 'material_transfer' ? 'active' : ''}`} onClick={() => setActiveTab('material_transfer')}>
                   <ArrowLeftRight size={18} />
                   <span className="sidebar-text">Material Transfer</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'warehouse_locations' ? 'active' : ''}`} onClick={() => setActiveTab('warehouse_locations')}>
+                  <Layers size={18} />
+                  <span className="sidebar-text">Warehouse Locations</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'rgp' ? 'active' : ''}`} onClick={() => setActiveTab('rgp')}>
+                  <Truck size={18} />
+                  <span className="sidebar-text">Returnable Gate Pass</span>
+                </li>
+                <li className={`sidebar-item ${activeTab === 'generate_po' ? 'active' : ''}`} onClick={() => setActiveTab('generate_po')}>
+                  <FileText size={18} />
+                  <span className="sidebar-text">Generate PO</span>
                 </li>
                 <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                   <History size={18} />
@@ -1828,6 +1870,7 @@ export default function App() {
               {activeTab === 'return_material' && 'Return Material'}
               {activeTab === 'material_details' && 'Material Detail'}
               {activeTab === 'material_transfer' && 'Material Transfer'}
+              {activeTab === 'warehouse_locations' && 'Warehouse Locations'}
               {activeTab === 'reports_history' && 'Report and History'}
               {activeTab === 'settings' && 'Setting'}
               {activeTab === 'approval_queue' && (currentUser?.role === 'Admin' ? 'Approval Queue' : 'My Requests')}
@@ -2120,6 +2163,8 @@ export default function App() {
               onAddMaterial={handleAddMaterial}
               onDeleteMaterial={handleDeleteMaterial}
               onUpdateMaterial={handleUpdateMaterial}
+              racks={racks}
+              setRacks={setRacks}
             />
           )}
 
@@ -2158,11 +2203,15 @@ export default function App() {
           )}
 
           {activeTab === 'weight_capture' && currentUser && (
-            <WeightCapture />
+            <WeightCapture racks={racks} />
           )}
 
           {activeTab === 'material_transfer' && currentUser && (
             <MaterialTransferView currentUser={currentUser} />
+          )}
+
+          {activeTab === 'warehouse_locations' && (
+            <WarehouseLocationView racks={racks} materials={materials} />
           )}
 
           {activeTab === 'po_verification' && (

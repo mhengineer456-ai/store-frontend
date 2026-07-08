@@ -19,7 +19,9 @@ export default function SettingsView({
   materials = [],
   onAddMaterial,
   onDeleteMaterial,
-  onUpdateMaterial
+  onUpdateMaterial,
+  racks = [],
+  setRacks
 }) {
   const [isAddingVendor, setIsAddingVendor] = useState(false);
   const [vendorName, setVendorName] = useState('');
@@ -40,6 +42,49 @@ export default function SettingsView({
   const [matThreshold, setMatThreshold] = useState('50');
   const [matColor, setMatColor] = useState('');
   const [matError, setMatError] = useState('');
+
+  // Racks management states
+  const [rackName, setRackName] = useState('');
+  const [rackCode, setRackCode] = useState('');
+  const [rackShelves, setRackShelves] = useState('3');
+  const [rackLevels, setRackLevels] = useState('2');
+  const [rackWarehouse, setRackWarehouse] = useState('Main Warehouse');
+  const [rackError, setRackError] = useState('');
+
+  const handleAddRack = (e) => {
+    e.preventDefault();
+    if (!rackName.trim() || !rackCode.trim()) {
+      setRackError('Rack Name and Code are required');
+      return;
+    }
+    const codeClean = rackCode.trim().toUpperCase();
+    if (racks.some(r => r.code === codeClean)) {
+      setRackError(`Rack Code "${codeClean}" already exists`);
+      return;
+    }
+    setRackError('');
+
+    const newRack = {
+      id: String(Date.now()),
+      code: codeClean,
+      name: rackName.trim(),
+      shelves: parseInt(rackShelves, 10) || 1,
+      levels: parseInt(rackLevels, 10) || 1,
+      warehouse: rackWarehouse
+    };
+
+    setRacks([...racks, newRack]);
+    setRackName('');
+    setRackCode('');
+    setRackShelves('3');
+    setRackLevels('2');
+  };
+
+  const handleDeleteRack = (rackId) => {
+    if (window.confirm('Are you sure you want to delete this rack? All associated locations will be removed.')) {
+      setRacks(racks.filter(r => r.id !== rackId));
+    }
+  };
 
   const handleAddVendor = (e) => {
     e.preventDefault();
@@ -184,6 +229,167 @@ export default function SettingsView({
                 onChange={(e) => setDefaultTax(Number(e.target.value))} 
               />
             </div>
+          </div>
+
+          {/* Warehouse Rack Location Configurations */}
+          <div className="panel" style={{ marginBottom: 0 }}>
+            <div className="panel-header">
+              <h3 className="panel-title">
+                <Package size={18} className="text-accent" />
+                Warehouse Racks Configuration ({racks.length})
+              </h3>
+            </div>
+            
+            <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '12px' }}>
+              Define warehouse layout racks. Each rack automatically generates grid locations (Shelves &times; Levels) dynamically.
+            </p>
+
+            {/* List of active racks */}
+            <div style={{ 
+              maxHeight: '180px', 
+              overflowY: 'auto', 
+              border: '1px solid var(--border-color)', 
+              borderRadius: 'var(--border-radius-md)', 
+              padding: '8px',
+              backgroundColor: 'var(--bg-primary)',
+              marginBottom: '12px'
+            }}>
+              {racks.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '12px', textAlign: 'center' }}>
+                  No racks configured. Add one below.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {racks.map((rack) => (
+                    <div 
+                      key={rack.id} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between', 
+                        padding: '6px 10px', 
+                        backgroundColor: 'var(--bg-secondary)', 
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color)',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ fontWeight: '700' }}>{rack.name} ({rack.code})</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          {rack.warehouse} • {rack.shelves} Shelves &times; {rack.levels} Levels ({rack.shelves * rack.levels} Slots)
+                        </span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteRack(rack.id)}
+                        style={{
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--danger)',
+                          cursor: 'pointer',
+                          padding: '4px'
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Rack Form */}
+            <form onSubmit={handleAddRack} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Rack Name</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Rack A"
+                    className="form-input" 
+                    style={{ height: '32px', fontSize: '12px' }}
+                    value={rackName} 
+                    onChange={(e) => setRackName(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Rack Code (Prefix)</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. A"
+                    className="form-input" 
+                    style={{ height: '32px', fontSize: '12px' }}
+                    maxLength="2"
+                    value={rackCode} 
+                    onChange={(e) => setRackCode(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Shelves</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="10"
+                    className="form-input" 
+                    style={{ height: '32px', fontSize: '12px' }}
+                    value={rackShelves} 
+                    onChange={(e) => setRackShelves(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Levels per Shelf</label>
+                  <input 
+                    type="number" 
+                    min="1"
+                    max="10"
+                    className="form-input" 
+                    style={{ height: '32px', fontSize: '12px' }}
+                    value={rackLevels} 
+                    onChange={(e) => setRackLevels(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Warehouse Location</label>
+                <select
+                  className="form-input"
+                  style={{ height: '32px', fontSize: '12px' }}
+                  value={rackWarehouse}
+                  onChange={(e) => setRackWarehouse(e.target.value)}
+                >
+                  <option value="Main Warehouse">Main Warehouse</option>
+                  <option value="Dyeing Store">Dyeing Store</option>
+                </select>
+              </div>
+
+              {rackError && (
+                <div style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: '600' }}>
+                  ⚠️ {rackError}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                className="btn btn-secondary" 
+                style={{ 
+                  marginTop: '4px',
+                  height: '32px', 
+                  fontSize: '12px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px' 
+                }}
+              >
+                <PlusCircle size={14} />
+                <span>Add Rack Layout</span>
+              </button>
+            </form>
           </div>
 
           {/* Garment Accessories Catalog Configurations */}

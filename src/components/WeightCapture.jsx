@@ -33,7 +33,7 @@ const MATERIAL_OPTIONS = [
 ];
 
 
-export default function WeightCapture() {
+export default function WeightCapture({ racks = [] }) {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [stable, setStable] = useState(false);
@@ -46,6 +46,21 @@ export default function WeightCapture() {
   const [saveDialog, setSaveDialog] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
+
+  // Compute dynamic slot options from the racks configuration passed as a prop
+  const generatedLocations = useMemo(() => {
+    const list = [];
+    racks.forEach(rack => {
+      for (let s = 1; s <= rack.shelves; s++) {
+        for (let l = 1; l <= rack.levels; l++) {
+          const slotNum = (s - 1) * rack.levels + l;
+          const code = `${rack.code}${slotNum < 10 ? '0' + slotNum : slotNum}`;
+          list.push({ code, label: `${rack.warehouse} - Rack ${rack.code} (Slot ${code})` });
+        }
+      }
+    });
+    return list;
+  }, [racks]);
   const [now, setNow] = useState(new Date());
   const [page, setPage] = useState(0);
   const [rpp, setRpp] = useState(5);
@@ -1258,15 +1273,19 @@ export default function WeightCapture() {
               </div>
 
               <div className="form-group">
-                <label className="wcs-label" style={{ color: '#0f172a', fontWeight: '800' }}>Location (Hall / Zone / Rack) <span style={{ color: '#ef4444' }}>*</span></label>
-                <input
-                  type="text"
+                <label className="wcs-label" style={{ color: '#0f172a', fontWeight: '800' }}>Location Slot <span style={{ color: '#ef4444' }}>*</span></label>
+                <select
+                  required
                   className="wcs-input"
                   value={form.storeLocation}
                   onChange={setF('storeLocation')}
-                  placeholder="e.g. HALL 3 RACK 7"
-                  style={{ height: '40px', fontSize: '14px', fontWeight: '700', color: '#0f172a' }}
-                />
+                  style={{ height: '40px', fontSize: '14px', fontWeight: '700', color: '#0f172a', cursor: 'pointer' }}
+                >
+                  <option value="">-- Select Configured Location Slot --</option>
+                  {generatedLocations.map(loc => (
+                    <option key={loc.code} value={loc.code}>{loc.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="form-group">
@@ -1746,13 +1765,17 @@ export default function WeightCapture() {
               {locationMode === 'same' ? (
                 <div>
                   <label className="wcs-label">Store Location</label>
-                  <input
-                    type="text"
+                  <select
                     className="wcs-input"
-                    placeholder="e.g. hall 2 rack 3"
                     value={form.storeLocation}
                     onChange={setF('storeLocation')}
-                  />
+                    style={{ height: '36px', fontSize: '13px', color: '#0f172a', cursor: 'pointer' }}
+                  >
+                    <option value="">-- Select Configured Location Slot --</option>
+                    {generatedLocations.map(loc => (
+                      <option key={loc.code} value={loc.code}>{loc.label}</option>
+                    ))}
+                  </select>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1760,17 +1783,20 @@ export default function WeightCapture() {
                     <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <div style={{ flex: 2 }}>
                         <label style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>Location #{idx + 1}</label>
-                        <input
-                          type="text"
+                        <select
                           className="wcs-input"
-                          placeholder="e.g. hall 1 rack 2"
                           value={grp.location}
                           onChange={e => {
                             const val = e.target.value;
                             setLocationGroups(prev => prev.map((g, i) => i === idx ? { ...g, location: val } : g));
                           }}
-                          style={{ padding: '6px 10px', fontSize: '12px' }}
-                        />
+                          style={{ padding: '4px 8px', fontSize: '12px', height: '32px', color: '#0f172a', cursor: 'pointer' }}
+                        >
+                          <option value="">-- Select Slot --</option>
+                          {generatedLocations.map(loc => (
+                            <option key={loc.code} value={loc.code}>{loc.code} ({loc.label.split(' - ')[0]})</option>
+                          ))}
+                        </select>
                       </div>
                       <div style={{ flex: 1 }}>
                         <label style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>Packets</label>

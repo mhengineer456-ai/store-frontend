@@ -885,21 +885,7 @@ export default function MaterialIssueView({
 
   return (
     <div className="animate-fade" style={{ paddingBottom: '60px' }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '24px',
-        flexWrap: 'wrap',
-        gap: '16px'
-      }}>
-        <div>
-          <h2 style={{ fontFamily: 'var(--font-family-title)', fontSize: '22px', fontWeight: '700' }}>Material Issue Center</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-
-          </p>
-        </div>
-      </div>
+      <div style={{ height: '8px' }} />
 
 
       {formSuccess && (
@@ -920,7 +906,7 @@ export default function MaterialIssueView({
         </div>
       )}
 
-      <div className="split-view" style={{ gridTemplateColumns: '1fr 1.2fr', gap: '24px' }}>
+      <div className="split-view split-view-asymmetric">
         {/* Left Side: Manufacturing Batch Selector */}
         <div className="panel" style={{ height: 'fit-content' }}>
           <div className="panel-header">
@@ -1007,172 +993,220 @@ export default function MaterialIssueView({
               </div>
             )}
 
-            <div className="form-group">
-              <label className="form-label">Search & Select Approved Lot</label>
-              <div style={{ position: 'relative' }}>
+            {/* Setup Inputs Stack */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              marginBottom: '20px'
+            }}>
+              {/* Search & Select Approved Lot */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Search & Select Approved Lot</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="🔍 Type Lot ID, Brand, or Category to filter & select..."
+                    value={
+                      isFocused
+                        ? searchQuery
+                        : (selectedDesign
+                          ? `Lot ${selectedDesign.id} — ${selectedDesign.brand || 'No Brand'} (${selectedDesign.category})`
+                          : ''
+                        )
+                    }
+                    onFocus={() => {
+                      setIsFocused(true);
+                      setIsOpen(true);
+                      setSearchQuery('');
+                    }}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ paddingRight: '32px' }}
+                  />
+
+                  {/* Custom dropdown caret indicator */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      fontSize: '10px',
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    ▼
+                  </div>
+
+                  {isOpen && (
+                    <>
+                      {/* Transparent Click-Outside Overlay */}
+                      <div
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          zIndex: 40,
+                          background: 'transparent'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsOpen(false);
+                          setIsFocused(false);
+                        }}
+                      />
+
+                      {/* Scrollable floating dropdown menu list */}
+                      <div className="custom-dropdown-menu">
+                        {filteredDesigns.length === 0 ? (
+                          <div style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>
+                            No matching lots found
+                          </div>
+                        ) : (
+                          filteredDesigns.map(design => {
+                            const lotStatus = getLotIssueStatus(design);
+                            const isSelectionDisabled = issueMode === 'initial'
+                              ? lotStatus === 'completed'
+                              : lotStatus === 'ready';
+                            const isSelected = String(design.id) === String(selectedDesignId);
+
+                            return (
+                              <div
+                                key={design.id}
+                                onClick={() => {
+                                  if (!isSelectionDisabled) {
+                                    setSelectedDesignId(design.id);
+                                    setIsOpen(false);
+                                    setIsFocused(false);
+                                    setSearchQuery('');
+                                  }
+                                }}
+                                style={{
+                                  padding: '10px 14px',
+                                  fontSize: '13px',
+                                  cursor: isSelectionDisabled ? 'not-allowed' : 'pointer',
+                                  opacity: isSelectionDisabled ? 0.5 : 1,
+                                  backgroundColor: isSelected
+                                    ? 'var(--accent-color)'
+                                    : 'transparent',
+                                  color: isSelected ? '#ffffff' : 'var(--text-main)',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  borderBottom: '1px solid var(--border-color)',
+                                  transition: 'background-color 0.15s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelectionDisabled && !isSelected) {
+                                    e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelectionDisabled && !isSelected) {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }
+                                }}
+                              >
+                                <div>
+                                  <strong>Lot {design.id}</strong>
+                                  <span style={{ marginLeft: '8px', fontSize: '11px', opacity: 0.8 }}>
+                                    ({design.category}) &mdash; {design.brand || 'No Brand'}
+                                  </span>
+                                </div>
+                                {issueMode === 'initial' ? (
+                                  <>
+                                    {lotStatus === 'completed' && (
+                                      <span className="status-badge rejected" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                        Already Issued
+                                      </span>
+                                    )}
+                                    {lotStatus === 'in_process' && (
+                                      <span className="status-badge pending" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'var(--warning-light)', color: 'var(--warning)' }}>
+                                        In Process
+                                      </span>
+                                    )}
+                                    {lotStatus === 'ready' && (
+                                      <span className="status-badge verified" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                        Ready
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {lotStatus === 'ready' ? (
+                                      <span className="status-badge rejected" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                        Not Issued Yet
+                                      </span>
+                                    ) : (
+                                      <span className="status-badge verified" style={{ fontSize: '10px', padding: '2px 6px' }}>
+                                        Ready to Re-issue
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Garment Pieces to Manufacture */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Garment Pieces to Manufacture</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  min="1"
+                  placeholder={isLoadingPieces ? "Fetching..." : "e.g. 500"}
+                  value={isLoadingPieces ? "" : pieces}
+                  onChange={(e) => setPieces(Math.max(1, Number(e.target.value)))}
+                  disabled={isSelectedDesignAlreadyIssued || isLoadingPieces}
+                  required
+                />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                  {isLoadingPieces
+                    ? "Retrieving pieces count from cutting logs..."
+                    : "Scales required BOM quantities automatically."
+                  }
+                </span>
+              </div>
+
+              {/* Person Name (Issuer) */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Person Name (Issuer)</label>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="🔍 Type Lot ID, Brand, or Category to filter & select..."
-                  value={
-                    isFocused
-                      ? searchQuery
-                      : (selectedDesign
-                        ? `Lot ${selectedDesign.id} — ${selectedDesign.brand || 'No Brand'} (${selectedDesign.category})`
-                        : ''
-                      )
-                  }
-                  onFocus={() => {
-                    setIsFocused(true);
-                    setIsOpen(true);
-                    setSearchQuery('');
-                  }}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ paddingRight: '32px' }}
+                  placeholder="e.g. John Doe"
+                  value={personName}
+                  onChange={(e) => setPersonName(e.target.value)}
+                  disabled={isSelectedDesignAlreadyIssued}
+                  required
                 />
-
-                {/* Custom dropdown caret indicator */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    cursor: 'pointer',
-                    color: 'var(--text-muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontSize: '10px',
-                    pointerEvents: 'none'
-                  }}
-                >
-                  ▼
-                </div>
-
-                {isOpen && (
-                  <>
-                    {/* Transparent Click-Outside Overlay */}
-                    <div
-                      style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 40,
-                        background: 'transparent'
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsOpen(false);
-                        setIsFocused(false);
-                      }}
-                    />
-
-                    {/* Scrollable floating dropdown menu list */}
-                    <div className="custom-dropdown-menu">
-                      {filteredDesigns.length === 0 ? (
-                        <div style={{ padding: '12px', color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center' }}>
-                          No matching lots found
-                        </div>
-                      ) : (
-                        filteredDesigns.map(design => {
-                          const lotStatus = getLotIssueStatus(design);
-                          const isSelectionDisabled = issueMode === 'initial'
-                            ? lotStatus === 'completed'
-                            : lotStatus === 'ready';
-                          const isSelected = String(design.id) === String(selectedDesignId);
-
-                          return (
-                            <div
-                              key={design.id}
-                              onClick={() => {
-                                if (!isSelectionDisabled) {
-                                  setSelectedDesignId(design.id);
-                                  setIsOpen(false);
-                                  setIsFocused(false);
-                                  setSearchQuery('');
-                                }
-                              }}
-                              style={{
-                                padding: '10px 14px',
-                                fontSize: '13px',
-                                cursor: isSelectionDisabled ? 'not-allowed' : 'pointer',
-                                opacity: isSelectionDisabled ? 0.5 : 1,
-                                backgroundColor: isSelected
-                                  ? 'var(--accent-color)'
-                                  : 'transparent',
-                                color: isSelected ? '#ffffff' : 'var(--text-main)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                borderBottom: '1px solid var(--border-color)',
-                                transition: 'background-color 0.15s ease'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isSelectionDisabled && !isSelected) {
-                                  e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (!isSelectionDisabled && !isSelected) {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }
-                              }}
-                            >
-                              <div>
-                                <strong>Lot {design.id}</strong>
-                                <span style={{ marginLeft: '8px', fontSize: '11px', opacity: 0.8 }}>
-                                  ({design.category}) &mdash; {design.brand || 'No Brand'}
-                                </span>
-                              </div>
-                              {issueMode === 'initial' ? (
-                                <>
-                                  {lotStatus === 'completed' && (
-                                    <span className="status-badge rejected" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                                      Already Issued
-                                    </span>
-                                  )}
-                                  {lotStatus === 'in_process' && (
-                                    <span className="status-badge pending" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'var(--warning-light)', color: 'var(--warning)' }}>
-                                      In Process
-                                    </span>
-                                  )}
-                                  {lotStatus === 'ready' && (
-                                    <span className="status-badge verified" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                                      Ready
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  {lotStatus === 'ready' ? (
-                                    <span className="status-badge rejected" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                                      Not Issued Yet
-                                    </span>
-                                  ) : (
-                                    <span className="status-badge verified" style={{ fontSize: '10px', padding: '2px 6px' }}>
-                                      Ready to Re-issue
-                                    </span>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                )}
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
+                  Records the name of the person issuing the raw materials.
+                </span>
               </div>
             </div>
 
+            {/* Warning alerts placed cleanly below inputs */}
             {isSelectedDesignAlreadyIssued && (
               <div style={{
                 color: 'var(--danger)',
                 fontSize: '13px',
                 fontWeight: '600',
-                marginBottom: '16px',
+                marginBottom: '20px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
@@ -1191,7 +1225,7 @@ export default function MaterialIssueView({
                 color: 'var(--warning)',
                 fontSize: '13px',
                 fontWeight: '600',
-                marginBottom: '16px',
+                marginBottom: '20px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
@@ -1205,51 +1239,16 @@ export default function MaterialIssueView({
               </div>
             )}
 
-            <div className="form-group">
-              <label className="form-label">Garment Pieces to Manufacture</label>
-              <input
-                type="number"
-                className="form-input"
-                min="1"
-                placeholder={isLoadingPieces ? "Fetching..." : "e.g. 500"}
-                value={isLoadingPieces ? "" : pieces}
-                onChange={(e) => setPieces(Math.max(1, Number(e.target.value)))}
-                disabled={isSelectedDesignAlreadyIssued || isLoadingPieces}
-                required
-              />
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                {isLoadingPieces
-                  ? "Retrieving pieces count from cutting logs..."
-                  : "Scales required BOM quantities automatically based on unit consumption rates."
-                }
-              </span>
-            </div>
-
-            <div className="form-group" style={{ marginTop: '16px' }}>
-              <label className="form-label">Person Name (Issuer)</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. John Doe"
-                value={personName}
-                onChange={(e) => setPersonName(e.target.value)}
-                disabled={isSelectedDesignAlreadyIssued}
-                required
-              />
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                Records the name of the person issuing the raw materials.
-              </span>
-            </div>
-
             {selectedDesign && bomMappings.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '24px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                 {/* Role indicator for non-admin users */}
                 {!isAdmin && issueMode === 'reissue' && (
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
                     padding: '10px 12px', borderRadius: 'var(--border-radius-sm)',
                     backgroundColor: 'var(--accent-light)', color: 'var(--accent-color)',
-                    border: '1px solid rgba(99,102,241,0.2)', fontSize: '12px', fontWeight: '600'
+                    border: '1px solid rgba(99,102,241,0.2)', fontSize: '12px', fontWeight: '600',
+                    width: '100%'
                   }}>
                     <Shield size={14} />
                     <span>As a non-admin user, your re-issue request will be sent to Admin for approval before materials are deducted.</span>
@@ -1343,7 +1342,7 @@ export default function MaterialIssueView({
                 </div>
               </div>
 
-              <div className="custom-table-container">
+              <div className="custom-table-container" style={{ overflow: 'visible', minHeight: '320px' }}>
                 <table className="custom-table" style={{ fontSize: '13px' }}>
                   <thead>
                     <tr>
