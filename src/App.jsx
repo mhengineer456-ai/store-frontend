@@ -271,6 +271,7 @@ const hasTabAccess = (tabName, role) => {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isVerifyingToken, setIsVerifyingToken] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [designMenuOpen, setDesignMenuOpen] = useState(true);
@@ -292,6 +293,10 @@ export default function App() {
       setCustomAlert(message);
     };
 
+    const timer = setTimeout(() => {
+      setShowSplash(false);
+    }, 2200);
+
     const params = new URLSearchParams(window.location.search);
     const action = params.get('action');
     const lot = params.get('lot');
@@ -311,6 +316,10 @@ export default function App() {
     if (poType) {
       setScanPoType(poType);
     }
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, []);
 
   const handleRedirectToTab = (tabName) => {
@@ -1488,7 +1497,7 @@ export default function App() {
     );
   }
 
-  if (isVerifyingToken) {
+  if (showSplash || isVerifyingToken) {
     return (
       <div style={{
         display: 'flex',
@@ -1496,23 +1505,126 @@ export default function App() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        backgroundColor: 'var(--bg-primary)',
-        color: 'var(--text-main)',
-        fontFamily: 'var(--font-family-body)'
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #020617 100%)',
+        color: '#ffffff',
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 9999,
+        transition: 'opacity 0.5s ease',
       }}>
+        {/* Pulsing glow ring */}
         <div style={{
-          width: '40px',
-          height: '40px',
-          borderRadius: '50%',
-          border: '4px solid var(--accent-light)',
-          borderTopColor: 'var(--accent-color)',
-          animation: 'spin 1s linear infinite',
-          marginBottom: '16px'
-        }}></div>
-        <span style={{ fontWeight: '600', fontSize: '15px' }}>Verifying Secure Session...</span>
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '28px'
+        }}>
+          <div style={{
+            position: 'absolute',
+            width: '100px',
+            height: '100px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, rgba(99, 102, 241, 0) 70%)',
+            animation: 'pulseGlow 2s infinite ease-in-out'
+          }} />
+          
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '24px',
+            background: 'linear-gradient(135deg, #6366f1 0%, #4338ca 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(99, 102, 241, 0.3)',
+            animation: 'floatLogo 3s infinite ease-in-out',
+            zIndex: 1
+          }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+            </svg>
+          </div>
+        </div>
+
+        <h1 style={{
+          fontSize: '32px',
+          fontWeight: '900',
+          letterSpacing: '6px',
+          margin: '0 0 8px 0',
+          background: 'linear-gradient(to right, #ffffff 30%, #c7d2fe 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          textShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          textTransform: 'uppercase'
+        }}>
+          MH STORE
+        </h1>
+
+        <p style={{
+          fontSize: '11px',
+          fontWeight: '600',
+          letterSpacing: '3px',
+          color: '#94a3b8',
+          margin: '0 0 40px 0',
+          textTransform: 'uppercase',
+          textAlign: 'center',
+          maxWidth: '80%'
+        }}>
+          Garment Production & Inventory Management System
+        </p>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <div style={{
+            width: '160px',
+            height: '4px',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '2px',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            <div style={{
+              position: 'absolute',
+              height: '100%',
+              width: '50%',
+              background: 'linear-gradient(90deg, #6366f1, #a5b4fc)',
+              borderRadius: '2px',
+              animation: 'loadingProgress 1.5s infinite ease-in-out'
+            }} />
+          </div>
+          <span style={{
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#64748b',
+            letterSpacing: '1px',
+            textTransform: 'uppercase'
+          }}>
+            {isVerifyingToken ? 'Verifying Secure Session...' : 'Loading system data...'}
+          </span>
+        </div>
+
         <style>{`
-          @keyframes spin {
-            to { transform: rotate(360deg); }
+          @keyframes pulseGlow {
+            0%, 100% { transform: scale(0.9); opacity: 0.5; }
+            50% { transform: scale(1.3); opacity: 0.9; }
+          }
+          @keyframes floatLogo {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+          }
+          @keyframes loadingProgress {
+            0% { left: -50%; width: 30%; }
+            50% { width: 50%; }
+            100% { left: 120%; width: 30%; }
           }
         `}</style>
       </div>
