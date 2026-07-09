@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText, PlusCircle, Trash2, Download, RefreshCw,
   CheckCircle, AlertTriangle, Play, Settings, X, Search,
-  Briefcase, Truck, Award, UserCheck, Shield, ChevronDown
+  Briefcase, Truck, Award, UserCheck, Shield, ChevronDown, History
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
@@ -73,11 +73,11 @@ function generateNextPoNumber(existingPoNumbers) {
       }
     });
   }
-  
+
   if (parsedNumbers.length === 0) {
     return 'PO-11000';
   }
-  
+
   const maxNum = Math.max(...parsedNumbers);
   return `PO-${maxNum + 1}`;
 }
@@ -1097,8 +1097,150 @@ export default function GeneratePOView({
 }) {
   const approvedDesigns = designs.filter(d => d.status === 'Approved');
 
+  const [poViewMode, setPoViewMode] = useState('create');
+  const [poSearchQuery, setPoSearchQuery] = useState('');
   const [historyLogs, setHistoryLogs] = useState([]);
-  
+
+  const handleLoadPOFromHistory = async (poNumberStr) => {
+    setSearchPoNumber(poNumberStr);
+    setPoViewMode('create');
+    setIsLoadingPO(true);
+    setLoadError("");
+    try {
+      const backendUrl = getBackendUrl();
+      const res = await fetch(`${backendUrl}/api/pos/${encodeURIComponent(poNumberStr.trim())}`);
+      if (res.ok) {
+        const po = await res.json();
+        if (po) {
+          setSupplierName(po.vendorName || "");
+          setSupplierEmail(po.vendorEmail || "");
+          setSupplierAddress(po.vendorAddress || "");
+
+          if (po.date) setOrderDate(po.date.split(' ')[0]);
+          if (po.deliveryDate) setExpectedDate(po.deliveryDate.split(' ')[0]);
+
+          if (po.items) {
+            let poRows = [];
+            if (Array.isArray(po.items)) {
+              poRows = po.items;
+            } else {
+              try {
+                poRows = JSON.parse(po.items || '[]');
+              } catch (_) { }
+            }
+            setRows(poRows.map(item => {
+              const isMySQL = item.name !== undefined;
+              const desc = isMySQL ? (item.name || "") : (item.description || item.item || "");
+
+              let dept = "";
+              if (desc) {
+                const matched = sheetRows.find(r => r.item && r.item.toLowerCase().trim() === desc.toLowerCase().trim());
+                if (matched) dept = matched.dept || "";
+              }
+              if (!dept) dept = item.department || item.dept || "Trims";
+
+              return {
+                department: dept,
+                description: desc,
+                shade: isMySQL ? (item.description || "") : (item.shade || ""),
+                uom: isMySQL ? (item.unit || "") : (item.uom || ""),
+                qty: parseFloat(isMySQL ? item.qty : (item.qty || item.quantity)) || 0,
+                rate: parseFloat(isMySQL ? item.price : (item.rate || item.price)) || 0
+              };
+            }));
+          }
+          setLocalStorageItem(LOCAL_STORAGE_KEYS.LAST_PO_NUMBER, poNumberStr);
+          alert(`Successfully loaded PO ${poNumberStr} into active editor.`);
+        }
+      }
+    } catch (err) {
+      alert("Failed to load PO: " + err.message);
+    } finally {
+      setIsLoadingPO(false);
+    }
+  };
+
+  const handleDownloadPOFromHistory = async (po) => {
+    let poRows = [];
+    if (Array.isArray(po.items)) {
+      poRows = po.items;
+    } else {
+      try {
+        poRows = JSON.parse(po.items || '[]');
+      } catch (err) {
+        console.error("Failed to parse po items:", err);
+      }
+    }
+
+    const payload = {
+      meta: {
+        poNumber: po.poNumber,
+        orderDate: po.date ? po.date.split(' ')[0] : todayISO(),
+        orderTime: po.date ? po.date.split(' ')[1] : nowTime(),
+        expectedDate: po.deliveryDate || null,
+        expectedTime: null,
+        requisitionRaisedBy: po.requisitionRaisedBy || "SYSTEM",
+        preparedBy: po.preparedBy || "SYSTEM",
+        approvedBy: po.approvedBy || "SYSTEM",
+        remarks: po.remarks || "",
+        createdAt: po.date || new Date().toISOString(),
+        shadeEnabled: poRows.some(r => r.description),
+        gstEnabled: po.tax > 0,
+        gstPercentage: po.taxRate || 18,
+      },
+      supplierName: po.vendorName || '',
+      supplierAddress: po.vendorAddress || '',
+      supplierEmail: po.vendorEmail || '',
+      supplierPhone: '',
+      rows: poRows.map((r, i) => {
+        const isMySQLFormat = r.name !== undefined;
+        return {
+          line: r.line || (i + 1),
+          department: r.department || r.dept || "Trims",
+          description: isMySQLFormat ? r.name : (r.description || r.item || ""),
+          shade: isMySQLFormat ? r.description : (r.shade || ""),
+          uom: isMySQLFormat ? r.unit : (r.uom || r.unit || "PCS"),
+          qty: parseFloat(isMySQLFormat ? r.qty : (r.qty || r.quantity)) || 0,
+          rate: parseFloat(isMySQLFormat ? r.price : (r.rate || r.price)) || 0,
+          amount: (parseFloat(isMySQLFormat ? r.qty : r.qty) || 0) * (parseFloat(isMySQLFormat ? r.price : r.rate) || 0)
+        };
+      }),
+      totals: {
+        sub: po.subtotal || 0,
+        gstAmount: po.tax || 0,
+        grandTotal: po.total || 0
+      }
+    };
+
+    const systemBaseUrl = await resolveLocalSystemUrl();
+    const { gateUrl, recvUrl } = buildPoQrUrls({
+      base: systemBaseUrl || WEB_APP_BASE,
+      poNo: po.poNumber,
+      orderDate: payload.meta.orderDate,
+      expectedDate: payload.meta.expectedDate,
+      supervisorName: po.preparedBy || po.approvedBy,
+    });
+
+    const [gateQR, recvQR] = await Promise.all([
+      toDataURL_QR(gateUrl, 320),
+      toDataURL_QR(recvUrl, 320),
+    ]);
+
+    const doc = generatePurchaseOrderPDF({
+      payload,
+      options: {
+        qrGateImage: gateQR,
+        qrRecvImage: recvQR,
+        qrSide: 96,
+        shadeEnabled: payload.meta.shadeEnabled,
+        gstEnabled: payload.meta.gstEnabled,
+        gstPercentage: payload.meta.gstPercentage
+      },
+    });
+
+    downloadPdfBlob(doc, `${po.poNumber}.pdf`);
+  };
+
   useEffect(() => {
     fetch(`${getBackendUrl()}/api/design-history`)
       .then(res => {
@@ -1113,7 +1255,7 @@ export default function GeneratePOView({
     if (!selectedDesignId) return [];
     const logs = [];
     const designObj = approvedDesigns.find(d => String(d.id) === String(selectedDesignId));
-    
+
     // Find logs matching current lot ID
     historyLogs.forEach(h => {
       if (String(h.lotId).toLowerCase() === String(selectedDesignId).toLowerCase()) {
@@ -1499,15 +1641,15 @@ export default function GeneratePOView({
             setSupplierName(po.vendorName || "");
             setSupplierEmail(po.vendorEmail || "");
             setSupplierAddress(po.vendorAddress || "");
-            
+
             if (po.date) setOrderDate(po.date);
             if (po.deliveryDate) setExpectedDate(po.deliveryDate);
-            
+
             if (po.items && Array.isArray(po.items)) {
               setRows(po.items.map(item => {
                 const isMySQL = item.name !== undefined;
                 const desc = isMySQL ? (item.name || "") : (item.description || item.item || "");
-                
+
                 // Find matching department from sheetRows by looking up description
                 let dept = "";
                 if (desc) {
@@ -1530,7 +1672,7 @@ export default function GeneratePOView({
                 };
               }));
             }
-            
+
             loadedFromLocal = true;
             setLocalStorageItem(LOCAL_STORAGE_KEYS.LAST_PO_NUMBER, searchPoNumber);
             alert(`Successfully loaded PO ${searchPoNumber} from local database.`);
@@ -1907,579 +2049,756 @@ export default function GeneratePOView({
         }
       `}</style>
 
-      <div className="Header" style={{ marginBottom: '24px' }}>
-        <h2 className="Title" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '24px', fontWeight: '800' }}>
-          <FileText size={28} style={{ color: 'var(--accent-color)' }} />
-          Generate Purchase Order (PO)
-        </h2>
-        <p className="SubTitle" style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
-          Issue purchase orders, calculate tax rates, map color shades, and download print-ready PDFs with QR scan entries.
-        </p>
+      <div className="Header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div>
+          <h2 className="Title" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '24px', fontWeight: '800' }}>
+            <FileText size={28} style={{ color: 'var(--accent-color)' }} />
+            Generate Purchase Order (PO)
+          </h2>
+          <p className="SubTitle" style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
+            Issue purchase orders, calculate tax rates, map color shades, and download print-ready PDFs with QR scan entries.
+          </p>
+        </div>
+
+        {/* Pill switcher for Create PO vs Track History */}
+        <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)', height: 'fit-content' }}>
+          <button
+            type="button"
+            className={`btn ${poViewMode === 'create' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setPoViewMode('create')}
+            style={{
+              padding: '8px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', height: 'auto', minHeight: 'unset',
+              color: poViewMode === 'create' ? '#fff' : 'var(--text-main)',
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}
+          >
+            <PlusCircle size={16} /> Create PO
+          </button>
+          <button
+            type="button"
+            className={`btn ${poViewMode === 'history' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setPoViewMode('history')}
+            style={{
+              padding: '8px 20px', borderRadius: '8px', fontSize: '13px', fontWeight: 'bold', height: 'auto', minHeight: 'unset',
+              color: poViewMode === 'history' ? '#fff' : 'var(--text-main)',
+              display: 'flex', alignItems: 'center', gap: '6px'
+            }}
+          >
+            <History size={16} /> Track History
+          </button>
+        </div>
       </div>
 
-      <div className="po-split-layout">
+      {poViewMode === 'create' ? (
+        <div className="po-split-layout">
 
-        {/* LEFT SIDE: Tabbed editor blocks */}
-        <div className="po-left-pane" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* LEFT SIDE: Tabbed editor blocks */}
+          <div className="po-left-pane" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-          <div className="panel" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02), 0 8px 10px -6px rgba(0,0,0,0.02)' }}>
-            <div className="step-tabs">
-              <div
-                className={`step-tab ${leftActiveTab === 'specs' ? 'active' : ''}`}
-                onClick={() => setLeftActiveTab('specs')}
-              >
-                <Briefcase size={14} /> Specs & Ref
-              </div>
-              <div
-                className={`step-tab ${leftActiveTab === 'supplier' ? 'active' : ''}`}
-                onClick={() => setLeftActiveTab('supplier')}
-              >
-                <Truck size={14} /> Supplier Profile
-              </div>
-              <div
-                className={`step-tab ${leftActiveTab === 'verifications' ? 'active' : ''}`}
-                onClick={() => setLeftActiveTab('verifications')}
-              >
-                <UserCheck size={14} /> Signatures & Notes
-              </div>
-            </div>
-
-            {/* TAB 1: Specs & Ref */}
-            {leftActiveTab === 'specs' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ marginBottom: '4px' }}>
-                  <label className="FormLabel" style={{ display: 'block', marginBottom: '8px' }}>Purchase Order Mode</label>
-                  <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
-                    <button
-                      type="button"
-                      className={`btn ${poMode === 'lot' ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => handlePoModeChange('lot')}
-                      style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', height: 'auto', minHeight: 'unset', color: poMode === 'lot' ? '#fff' : 'var(--text-color)' }}
-                    >
-                      Against Lot
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn ${poMode === 'normal' ? 'btn-primary' : 'btn-ghost'}`}
-                      onClick={() => handlePoModeChange('normal')}
-                      style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', height: 'auto', minHeight: 'unset', color: poMode === 'normal' ? '#fff' : 'var(--text-color)' }}
-                    >
-                      Normal PO
-                    </button>
-                  </div>
+            <div className="panel" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02), 0 8px 10px -6px rgba(0,0,0,0.02)' }}>
+              <div className="step-tabs">
+                <div
+                  className={`step-tab ${leftActiveTab === 'specs' ? 'active' : ''}`}
+                  onClick={() => setLeftActiveTab('specs')}
+                >
+                  <Briefcase size={14} /> Specs & Ref
                 </div>
+                <div
+                  className={`step-tab ${leftActiveTab === 'supplier' ? 'active' : ''}`}
+                  onClick={() => setLeftActiveTab('supplier')}
+                >
+                  <Truck size={14} /> Supplier Profile
+                </div>
+                <div
+                  className={`step-tab ${leftActiveTab === 'verifications' ? 'active' : ''}`}
+                  onClick={() => setLeftActiveTab('verifications')}
+                >
+                  <UserCheck size={14} /> Signatures & Notes
+                </div>
+              </div>
 
-                <div className="po-grid-2">
-                  {poMode === 'lot' && (
-                    <div>
-                      <label className="FormLabel">Approved Design (Lot)</label>
-                      <SearchableDesignSelect
-                        designs={approvedDesigns}
-                        value={selectedDesignId}
-                        onChange={handleDesignChange}
-                        placeholder="-- Choose Approved Lot --"
+              {/* TAB 1: Specs & Ref */}
+              {leftActiveTab === 'specs' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ marginBottom: '4px' }}>
+                    <label className="FormLabel" style={{ display: 'block', marginBottom: '8px' }}>Purchase Order Mode</label>
+                    <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
+                      <button
+                        type="button"
+                        className={`btn ${poMode === 'lot' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => handlePoModeChange('lot')}
+                        style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', height: 'auto', minHeight: 'unset', color: poMode === 'lot' ? '#fff' : 'var(--text-color)' }}
+                      >
+                        Against Lot
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${poMode === 'normal' ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => handlePoModeChange('normal')}
+                        style={{ padding: '6px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', height: 'auto', minHeight: 'unset', color: poMode === 'normal' ? '#fff' : 'var(--text-color)' }}
+                      >
+                        Normal PO
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="po-grid-2">
+                    {poMode === 'lot' && (
+                      <div>
+                        <label className="FormLabel">Approved Design (Lot)</label>
+                        <SearchableDesignSelect
+                          designs={approvedDesigns}
+                          value={selectedDesignId}
+                          onChange={handleDesignChange}
+                          placeholder="-- Choose Approved Lot --"
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ gridColumn: poMode === 'lot' ? 'span 1' : 'span 2' }}>
+                      <label className="FormLabel">Vendor Profile</label>
+                      <select
+                        className="FilterSelect"
+                        value={selectedVendorId}
+                        onChange={e => handleVendorChange(e.target.value)}
+                        style={{ width: '100%', height: '40px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+                      >
+                        <option value="">-- Choose Vendor --</option>
+                        {vendors.map(v => (
+                          <option key={v.id} value={v.id}>{v.name} ({v.materialsJoined || 'Trims'})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="FormLabel">PO Reference Number *</label>
+                    <div className="po-input-group">
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={poNumber}
+                        onChange={e => setPoNumber(e.target.value)}
+                        style={{ flex: 1, borderRadius: '8px' }}
+                        required
                       />
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setPoNumber(makeUniquePoNumber())}
+                        style={{ padding: '0 12px', height: '40px', borderRadius: '8px' }}
+                        title="Regenerate Reference"
+                      >
+                        <RefreshCw size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="po-grid-2">
+                    <div>
+                      <label className="FormLabel">Order Date *</label>
+                      <input type="date" className="form-input" value={orderDate} onChange={e => setOrderDate(e.target.value)} style={{ borderRadius: '8px' }} required />
+                    </div>
+                    <div>
+                      <label className="FormLabel">Order Time *</label>
+                      <input type="time" className="form-input" value={orderTime} onChange={e => setOrderTime(e.target.value)} style={{ borderRadius: '8px' }} required />
+                    </div>
+                  </div>
+
+                  <div className="po-grid-2">
+                    <div>
+                      <label className="FormLabel">Expected Date</label>
+                      <input type="date" className="form-input" value={expectedDate} onChange={e => setExpectedDate(e.target.value)} style={{ borderRadius: '8px' }} />
+                    </div>
+                    <div>
+                      <label className="FormLabel">Expected Time</label>
+                      <input type="time" className="form-input" value={expectedTime} onChange={e => setExpectedTime(e.target.value)} style={{ borderRadius: '8px' }} />
+                    </div>
+                  </div>
+
+                  {leadHuman && (
+                    <div style={{ fontSize: '12px', background: 'var(--accent-light)', padding: '6px 12px', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: '600', alignSelf: 'start' }}>
+                      Expected Lead Time: {leadHuman}
                     </div>
                   )}
-
-                  <div style={{ gridColumn: poMode === 'lot' ? 'span 1' : 'span 2' }}>
-                    <label className="FormLabel">Vendor Profile</label>
-                    <select
-                      className="FilterSelect"
-                      value={selectedVendorId}
-                      onChange={e => handleVendorChange(e.target.value)}
-                      style={{ width: '100%', height: '40px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
-                    >
-                      <option value="">-- Choose Vendor --</option>
-                      {vendors.map(v => (
-                        <option key={v.id} value={v.id}>{v.name} ({v.materialsJoined || 'Trims'})</option>
-                      ))}
-                    </select>
-                  </div>
+                  {selectedDesignId && (
+                    <div style={{ marginTop: '10px', borderTop: '1.5px solid var(--border-color, #e2e8f0)', paddingTop: '14px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', display: 'block', marginBottom: '8px', letterSpacing: '0.04em' }}>
+                        📋 Design Lot Activity Log & Repeat History
+                      </span>
+                      {getDesignHistoryLogs().length === 0 ? (
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          No history logs found for this lot.
+                        </span>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', paddingRight: '4px' }}>
+                          {getDesignHistoryLogs().map((log, lIdx) => (
+                            <div key={lIdx} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-secondary, #f8fafc)', display: 'flex', flexDirection: 'column', gap: '2px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: '800', color: 'var(--accent-color, #6366f1)', textTransform: 'uppercase', fontSize: '9px' }}>
+                                  {log.action} {String(log.lotId) !== String(selectedDesignId) ? `(Lot #${log.lotId})` : ''}
+                                </span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>{log.timestamp}</span>
+                              </div>
+                              <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{log.details}</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>Operator: {log.actorName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
+              )}
 
-                <div>
-                  <label className="FormLabel">PO Reference Number *</label>
-                  <div className="po-input-group">
+              {/* TAB 2: Supplier Profile */}
+              {leftActiveTab === 'supplier' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label className="FormLabel">Supplier Name *</label>
                     <input
                       type="text"
                       className="form-input"
-                      value={poNumber}
-                      onChange={e => setPoNumber(e.target.value)}
-                      style={{ flex: 1, borderRadius: '8px' }}
+                      placeholder="Enter Supplier Name"
+                      value={supplierName}
+                      onChange={e => setSupplierName(e.target.value)}
+                      style={{ borderRadius: '8px' }}
                       required
                     />
+                  </div>
+                  <div>
+                    <label className="FormLabel">Supplier Address</label>
+                    <input type="text" className="form-input" placeholder="Enter Supplier Address" value={supplierAddress} onChange={e => setSupplierAddress(e.target.value)} style={{ borderRadius: '8px' }} />
+                  </div>
+                  <div className="po-grid-2">
+                    <div>
+                      <label className="FormLabel">Email Address</label>
+                      <input type="email" className="form-input" placeholder="supplier@example.com" value={supplierEmail} onChange={e => setSupplierEmail(e.target.value)} style={{ borderRadius: '8px' }} />
+                    </div>
+                    <div>
+                      <label className="FormLabel">Phone Number</label>
+                      <input type="text" className="form-input" placeholder="Phone details" value={supplierPhone} onChange={e => setSupplierPhone(e.target.value)} style={{ borderRadius: '8px' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: Verifications & Remarks */}
+              {leftActiveTab === 'verifications' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label className="FormLabel">Requisition Raised By *</label>
+                    <SmartDropdown
+                      value={requisitionRaisedBy}
+                      onChange={setRequisitionRaisedBy}
+                      options={savedRequisitionNames}
+                      placeholder="Search or type raiser name..."
+                      localStorageKey={LOCAL_STORAGE_KEYS.REQUISITION_NAMES}
+                      onSaveToLocalStorage={refreshSavedNames}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="FormLabel">Prepared By *</label>
+                    <SmartDropdown
+                      value={preparedBy}
+                      onChange={setPreparedBy}
+                      options={savedPreparedNames}
+                      placeholder="Search or type preparer name..."
+                      localStorageKey={LOCAL_STORAGE_KEYS.PREPARED_NAMES}
+                      onSaveToLocalStorage={refreshSavedNames}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="FormLabel">Authorized By (Approved By) *</label>
+                    <SmartDropdown
+                      value={approvedBy}
+                      onChange={setApprovedBy}
+                      options={savedApprovedNames}
+                      placeholder="Search or type authorizer name..."
+                      localStorageKey={LOCAL_STORAGE_KEYS.APPROVED_NAMES}
+                      onSaveToLocalStorage={refreshSavedNames}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="FormLabel">Remarks / Instructions</label>
+                    <textarea
+                      className="form-input"
+                      placeholder="Type optional PO terms, remarks, notes here..."
+                      value={remarks}
+                      onChange={e => setRemarks(e.target.value)}
+                      style={{ width: '100%', height: '70px', padding: '10px 14px', resize: 'vertical', borderRadius: '8px' }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowLoadDialog(true)}
+                  style={{ flex: 1, height: '40px', borderRadius: '8px' }}
+                >
+                  <Search size={16} /> Load PO
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={resetForm}
+                  style={{ height: '40px', padding: '0 16px', borderRadius: '8px' }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE: Live paper invoice sheet */}
+          <div className="po-right-pane">
+
+            <div className="po-document-paper">
+
+              <div>
+                {/* Paper Header */}
+                <div className="paper-header">
+                  <div>
+                    <h4 className="paper-company-title">STITCHPRO PVT. LTD.</h4>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Purchase Order Document</span>
+                  </div>
+                  <div className="paper-po-badge">
+                    {poNumber}
+                  </div>
+                </div>
+
+                {/* Paper Metadata Grid */}
+                <div className="paper-metadata-block">
+                  <div className="paper-meta-col">
+                    <div><strong>Order Date:</strong> {orderDate} {orderTime}</div>
+                    {expectedDate && <div><strong>Expected:</strong> {expectedDate} {expectedTime}</div>}
+                    {leadHuman && <div><strong>Lead Time:</strong> {leadHuman}</div>}
+                  </div>
+                  <div className="paper-meta-col" style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '20px' }}>
+                    <div><strong>Supplier:</strong> {supplierName || 'N/A'}</div>
+                    {supplierAddress && <div><strong>Address:</strong> {supplierAddress}</div>}
+                    {supplierPhone && <div><strong>Contact:</strong> {supplierPhone}</div>}
+                  </div>
+                </div>
+                {/* Toggle controls paper options */}
+                <div className="paper-toggles-bar print-hide" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', background: 'var(--bg-primary, #f8fafc)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color, #e2e8f0)' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-color, #6366f1)', textTransform: 'none', letterSpacing: 'normal' }}>Po Item Mapping</span>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', color: 'var(--text-main, #0f172a)', margin: 0 }}>
+                      <input type="checkbox" checked={shadeEnabled} onChange={e => {
+                        setShadeEnabled(e.target.checked);
+                        setLocalStorageItem(LOCAL_STORAGE_KEYS.SHADE_ENABLED, e.target.checked);
+                      }} style={{ width: '14px', height: '14px', cursor: 'pointer' }} />
+                      Shade
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', color: 'var(--text-main, #0f172a)', margin: 0 }}>
+                      <input type="checkbox" checked={gstEnabled} onChange={e => {
+                        setGstEnabled(e.target.checked);
+                        setLocalStorageItem(LOCAL_STORAGE_KEYS.GST_ENABLED, e.target.checked);
+                      }} style={{ width: '14px', height: '14px', cursor: 'pointer' }} />
+                      Tax (GST)
+                    </label>
+                    {gstEnabled && (
+                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '3px' }}>
+                          {[12, 18, 28].map(p => (
+                            <button
+                              key={p}
+                              type="button"
+                              className={`preset-pill ${gstPercentage === p ? 'active' : ''}`}
+                              onClick={() => {
+                                setGstPercentage(p);
+                                setLocalStorageItem(LOCAL_STORAGE_KEYS.GST_PERCENTAGE, p);
+                              }}
+                              style={{
+                                padding: '2px 8px', fontSize: '10px', borderRadius: '10px', height: '22px', border: '1px solid var(--border-color)', cursor: 'pointer',
+                                background: gstPercentage === p ? 'var(--accent-color, #6366f1)' : 'var(--bg-primary, #ffffff)',
+                                color: gstPercentage === p ? '#ffffff' : 'var(--text-muted, #64748b)',
+                                fontWeight: '700', display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                              }}
+                            >
+                              {p}%
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          <input
+                            type="number"
+                            value={![12, 18, 28].includes(gstPercentage) ? gstPercentage : ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const p = isNaN(val) ? 0 : val;
+                              setGstPercentage(p);
+                              setLocalStorageItem(LOCAL_STORAGE_KEYS.GST_PERCENTAGE, p);
+                            }}
+                            placeholder="Custom"
+                            style={{
+                              width: '52px',
+                              height: '22px',
+                              padding: '2px 4px',
+                              fontSize: '10px',
+                              borderRadius: '4px',
+                              border: '1px solid var(--border-color)',
+                              textAlign: 'right',
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-main)'
+                            }}
+                          />
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>%</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Paper Items Table */}
+                <div className="custom-table-container">
+                  <table className="custom-table" style={{ background: 'transparent' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '30px', textAlign: 'center', padding: '10px 8px' }}>#</th>
+                        <th style={{ width: '130px', padding: '10px 8px' }}>Dept *</th>
+                        <th style={{ padding: '10px 8px' }}>Description *</th>
+                        {shadeEnabled && <th style={{ width: '110px', padding: '10px 8px' }}>Shade</th>}
+                        <th style={{ width: '80px', textAlign: 'center', padding: '10px 8px' }}>UOM *</th>
+                        <th style={{ width: '80px', textAlign: 'right', padding: '10px 8px' }}>Qty *</th>
+                        <th style={{ width: '80px', textAlign: 'right', padding: '10px 8px' }}>Rate (₹)</th>
+                        <th style={{ width: '90px', textAlign: 'right', padding: '10px 8px' }}>Amount</th>
+                        <th style={{ width: '30px', textAlign: 'center', padding: '10px 8px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, idx) => {
+                        const rowAmt = (+row.qty || 0) * (+row.rate || 0);
+
+                        let dropdownOptions = [];
+                        const designItems = (designs || []).flatMap(d => d.bom || []);
+
+                        if (row.department) {
+                          const deptLower = row.department.toLowerCase().trim();
+                          const sheetItems = itemsByDept[row.department] || [];
+                          const bomItems = designItems
+                            .filter(item => (item.category || 'Trims').toLowerCase().trim() === deptLower)
+                            .map(item => item.name);
+                          const catItems = (materials || [])
+                            .filter(m => (m.category || 'Trims').toLowerCase().trim() === deptLower)
+                            .map(m => m.name);
+                          dropdownOptions = [...sheetItems, ...bomItems, ...catItems];
+                        } else {
+                          const sheetItems = sheetRows.map(r => r.item).filter(Boolean);
+                          const bomItems = designItems.map(item => item.name);
+                          const catItems = (materials || []).map(m => m.name);
+                          dropdownOptions = [...sheetItems, ...bomItems, ...catItems];
+                        }
+
+                        const cleanDropdownOptions = Array.from(new Set(dropdownOptions.filter(Boolean)));
+                        const finalOptions = Array.from(new Set([...cleanDropdownOptions, ...savedDescriptions])).sort((a, b) => a.localeCompare(b));
+
+                        return (
+                          <tr key={idx}>
+                            <td style={{ textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', padding: '8px' }}>{idx + 1}</td>
+                            <td style={{ padding: '8px' }}>
+                              <select
+                                value={row.department}
+                                onChange={e => {
+                                  const newDept = e.target.value;
+                                  const matchedRow = sheetRows.find(r => String(r.item).toLowerCase().trim() === String(row.description).toLowerCase().trim());
+                                  const keepDescription = matchedRow && matchedRow.dept === newDept;
+                                  updateRow(idx, { department: newDept, description: keepDescription ? row.description : "" });
+                                }}
+                                style={{ padding: '4px 6px', fontSize: '12px' }}
+                              >
+                                <option value="">Dept</option>
+                                {departments.map(d => (
+                                  <option key={d} value={d}>{d}</option>
+                                ))}
+                                <option value="Trims">Trims</option>
+                                <option value="Fabric">Fabric</option>
+                                <option value="Packaging">Packaging</option>
+                              </select>
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <SmartDropdown
+                                value={row.description}
+                                onChange={val => {
+                                  const matchedRow = sheetRows.find(r => String(r.item).toLowerCase().trim() === String(val).toLowerCase().trim());
+                                  const extraUpdate = {};
+                                  if (matchedRow && matchedRow.dept) {
+                                    extraUpdate.department = matchedRow.dept;
+                                  }
+                                  updateRow(idx, { description: val, ...extraUpdate });
+                                  saveDescriptionWithDebounce(val);
+                                }}
+                                options={finalOptions}
+                                placeholder="Type item..."
+                                localStorageKey={LOCAL_STORAGE_KEYS.DESCRIPTIONS}
+                                onSaveToLocalStorage={() => setSavedDescriptions(getLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, []))}
+                                required
+                              />
+                            </td>
+                            {shadeEnabled && (
+                              <td style={{ padding: '8px' }}>
+                                <SmartDropdown
+                                  value={row.shade}
+                                  onChange={val => {
+                                    updateRow(idx, { shade: val });
+                                    saveShadeWithDebounce(val);
+                                  }}
+                                  options={savedShades}
+                                  placeholder="Color"
+                                  localStorageKey={LOCAL_STORAGE_KEYS.SHADES}
+                                  onSaveToLocalStorage={() => setSavedShades(getLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, []))}
+                                />
+                              </td>
+                            )}
+                            <td style={{ padding: '8px' }}>
+                              <select
+                                value={row.uom}
+                                onChange={e => updateRow(idx, { uom: e.target.value })}
+                                style={{ padding: '4px 6px', fontSize: '12px' }}
+                              >
+                                <option value="">UOM</option>
+                                {UOM_OPTIONS.map(u => (
+                                  <option key={u} value={u}>{u}</option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="number"
+                                value={row.qty || ""}
+                                onChange={e => updateRow(idx, { qty: parseFloat(e.target.value) || 0 })}
+                                style={{ textAlign: 'right', padding: '4px 6px', fontSize: '12px' }}
+                                placeholder="0"
+                                min="0"
+                                required
+                              />
+                            </td>
+                            <td style={{ padding: '8px' }}>
+                              <input
+                                type="number"
+                                value={row.rate || ""}
+                                onChange={e => updateRow(idx, { rate: parseFloat(e.target.value) || 0 })}
+                                style={{ textAlign: 'right', padding: '4px 6px', fontSize: '12px' }}
+                                placeholder="0.00"
+                                min="0"
+                              />
+                            </td>
+                            <td style={{ textAlign: 'right', fontWeight: '700', color: 'var(--text-main)', fontSize: '12px', padding: '8px' }}>
+                              ₹{fmtMoney(rowAmt)}
+                            </td>
+                            <td style={{ textAlign: 'center', padding: '8px' }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => removeRow(idx)}
+                                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--danger)' }}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button
+                  className="btn btn-secondary"
+                  onClick={addRow}
+                  style={{ border: '1.5px dashed var(--border-color)', background: 'none', width: '100%', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--accent-color)', marginTop: '10px', borderRadius: '8px', fontSize: '12px' }}
+                >
+                  <PlusCircle size={14} /> Add New PO Item
+                </button>
+              </div>
+
+              <div>
+                {/* Calculations & Signatures footer inside paper */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', borderTop: '2px solid var(--text-main)', paddingTop: '14px', marginTop: '20px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                      <span>Subtotal:</span>
+                      <strong>₹{fmtMoney(totals.sub)}</strong>
+                    </div>
+                    {gstEnabled && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dashed var(--border-color)' }}>
+                        <span>GST ({gstPercentage}%):</span>
+                        <strong>₹{fmtMoney(totals.gstAmount)}</strong>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '15px', color: 'var(--accent-color)' }}>
+                      <span>Grand Total:</span>
+                      <strong style={{ fontSize: '17px', fontWeight: '800' }}>₹{fmtMoney(totals.grandTotal)}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => setShowSupervisorDialog(true)}
+                      disabled={isSubmitting}
+                      style={{ width: '100%', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', borderRadius: '8px' }}
+                    >
+                      {isSubmitting ? 'Saving PO...' : <><CheckCircle size={16} /> Confirm & Save PO</>}
+                    </button>
                     <button
                       className="btn btn-secondary"
-                      onClick={() => setPoNumber(makeUniquePoNumber())}
-                      style={{ padding: '0 12px', height: '40px', borderRadius: '8px' }}
-                      title="Regenerate Reference"
+                      onClick={handleDownloadPdfPreview}
+                      style={{ width: '100%', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '12px', borderRadius: '8px' }}
                     >
-                      <RefreshCw size={16} />
+                      <Download size={14} /> PDF Preview
                     </button>
                   </div>
                 </div>
 
-                <div className="po-grid-2">
-                  <div>
-                    <label className="FormLabel">Order Date *</label>
-                    <input type="date" className="form-input" value={orderDate} onChange={e => setOrderDate(e.target.value)} style={{ borderRadius: '8px' }} required />
+                {/* Dynamic signatures drawn on paper */}
+                <div className="paper-signatures">
+                  <div className="sig-box">
+                    <div>Raised By:</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '12px', marginTop: '4px' }}>{requisitionRaisedBy || '________'}</div>
+                    <div className="sig-line"></div>
+                    <div>Signature & Date</div>
                   </div>
-                  <div>
-                    <label className="FormLabel">Order Time *</label>
-                    <input type="time" className="form-input" value={orderTime} onChange={e => setOrderTime(e.target.value)} style={{ borderRadius: '8px' }} required />
+                  <div className="sig-box">
+                    <div>Prepared By:</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '12px', marginTop: '4px' }}>{preparedBy || '________'}</div>
+                    <div className="sig-line"></div>
+                    <div>Signature & Date</div>
                   </div>
-                </div>
-
-                <div className="po-grid-2">
-                  <div>
-                    <label className="FormLabel">Expected Date</label>
-                    <input type="date" className="form-input" value={expectedDate} onChange={e => setExpectedDate(e.target.value)} style={{ borderRadius: '8px' }} />
+                  <div className="sig-box">
+                    <div>Approved By:</div>
+                    <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '12px', marginTop: '4px' }}>{approvedBy || '________'}</div>
+                    <div className="sig-line"></div>
+                    <div>Signature & Date</div>
                   </div>
-                  <div>
-                    <label className="FormLabel">Expected Time</label>
-                    <input type="time" className="form-input" value={expectedTime} onChange={e => setExpectedTime(e.target.value)} style={{ borderRadius: '8px' }} />
-                  </div>
-                </div>
-
-                {leadHuman && (
-                  <div style={{ fontSize: '12px', background: 'var(--accent-light)', padding: '6px 12px', borderRadius: '8px', color: 'var(--accent-color)', fontWeight: '600', alignSelf: 'start' }}>
-                    Expected Lead Time: {leadHuman}
-                  </div>
-                )}
-                {selectedDesignId && (
-                  <div style={{ marginTop: '10px', borderTop: '1.5px solid var(--border-color, #e2e8f0)', paddingTop: '14px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted, #64748b)', textTransform: 'uppercase', display: 'block', marginBottom: '8px', letterSpacing: '0.04em' }}>
-                      📋 Design Lot Activity Log & Repeat History
-                    </span>
-                    {getDesignHistoryLogs().length === 0 ? (
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                        No history logs found for this lot.
-                      </span>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto', paddingRight: '4px' }}>
-                        {getDesignHistoryLogs().map((log, lIdx) => (
-                          <div key={lIdx} style={{ fontSize: '11px', padding: '6px 8px', borderRadius: '6px', background: 'var(--bg-secondary, #f8fafc)', display: 'flex', flexDirection: 'column', gap: '2px', border: '1px solid var(--border-color, #e2e8f0)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: '800', color: 'var(--accent-color, #6366f1)', textTransform: 'uppercase', fontSize: '9px' }}>
-                                {log.action} {String(log.lotId) !== String(selectedDesignId) ? `(Lot #${log.lotId})` : ''}
-                              </span>
-                              <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>{log.timestamp}</span>
-                            </div>
-                            <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{log.details}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>Operator: {log.actorName}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* TAB 2: Supplier Profile */}
-            {leftActiveTab === 'supplier' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label className="FormLabel">Supplier Name *</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Enter Supplier Name"
-                    value={supplierName}
-                    onChange={e => setSupplierName(e.target.value)}
-                    style={{ borderRadius: '8px' }}
-                    required
-                  />
-                </div>
-
-
-              </div>
-            )}
-
-            {/* TAB 3: Verifications & Remarks */}
-            {leftActiveTab === 'verifications' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <label className="FormLabel">Requisition Raised By *</label>
-                  <SmartDropdown
-                    value={requisitionRaisedBy}
-                    onChange={setRequisitionRaisedBy}
-                    options={savedRequisitionNames}
-                    placeholder="Search or type raiser name..."
-                    localStorageKey={LOCAL_STORAGE_KEYS.REQUISITION_NAMES}
-                    onSaveToLocalStorage={refreshSavedNames}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="FormLabel">Prepared By *</label>
-                  <SmartDropdown
-                    value={preparedBy}
-                    onChange={setPreparedBy}
-                    options={savedPreparedNames}
-                    placeholder="Search or type preparer name..."
-                    localStorageKey={LOCAL_STORAGE_KEYS.PREPARED_NAMES}
-                    onSaveToLocalStorage={refreshSavedNames}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="FormLabel">Authorized By (Approved By) *</label>
-                  <SmartDropdown
-                    value={approvedBy}
-                    onChange={setApprovedBy}
-                    options={savedApprovedNames}
-                    placeholder="Search or type authorizer name..."
-                    localStorageKey={LOCAL_STORAGE_KEYS.APPROVED_NAMES}
-                    onSaveToLocalStorage={refreshSavedNames}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="FormLabel">Remarks / Instructions</label>
-                  <textarea
-                    className="form-input"
-                    placeholder="Type optional PO terms, remarks, notes here..."
-                    value={remarks}
-                    onChange={e => setRemarks(e.target.value)}
-                    style={{ width: '100%', height: '70px', padding: '10px 14px', resize: 'vertical', borderRadius: '8px' }}
-                  />
                 </div>
               </div>
-            )}
-
-            <div style={{ display: 'flex', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowLoadDialog(true)}
-                style={{ flex: 1, height: '40px', borderRadius: '8px' }}
-              >
-                <Search size={16} /> Load PO
-              </button>
-              <button
-                className="btn btn-danger"
-                onClick={resetForm}
-                style={{ height: '40px', padding: '0 16px', borderRadius: '8px' }}
-              >
-                Reset
-              </button>
             </div>
           </div>
         </div>
-
-        {/* RIGHT SIDE: Live paper invoice sheet */}
-        <div className="po-right-pane">
-
-          <div className="po-document-paper">
-
+      ) : (
+        <div className="panel" style={{ padding: '24px', borderRadius: '16px', border: '1px solid var(--border-color)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.02)', backgroundColor: 'var(--bg-primary)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '16px', flexWrap: 'wrap' }}>
             <div>
-              {/* Paper Header */}
-              <div className="paper-header">
-                <div>
-                  <h4 className="paper-company-title">STITCHPRO PVT. LTD.</h4>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Purchase Order Document</span>
-                </div>
-                <div className="paper-po-badge">
-                  {poNumber}
-                </div>
-              </div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                Purchase Order Issuance Logs
+              </h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Track, filter, download, or load previously generated purchase orders from the local MySQL database.
+              </p>
+            </div>
 
-              {/* Paper Metadata Grid */}
-              <div className="paper-metadata-block">
-                <div className="paper-meta-col">
-                  <div><strong>Order Date:</strong> {orderDate} {orderTime}</div>
-                  {expectedDate && <div><strong>Expected:</strong> {expectedDate} {expectedTime}</div>}
-                  {leadHuman && <div><strong>Lead Time:</strong> {leadHuman}</div>}
-                </div>
-                <div className="paper-meta-col" style={{ borderLeft: '1px solid var(--border-color)', paddingLeft: '20px' }}>
-                  <div><strong>Supplier:</strong> {supplierName || 'N/A'}</div>
-                  {supplierAddress && <div><strong>Address:</strong> {supplierAddress}</div>}
-                  {supplierPhone && <div><strong>Contact:</strong> {supplierPhone}</div>}
-                </div>
-              </div>
+            <div style={{ position: 'relative', width: '300px' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                <Search size={16} />
+              </span>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search by PO#, Vendor, Design..."
+                value={poSearchQuery}
+                onChange={e => setPoSearchQuery(e.target.value)}
+                style={{ paddingLeft: '36px', width: '100%', borderRadius: '8px', height: '38px' }}
+              />
+            </div>
+          </div>
 
-              {/* Paper Items Table Actions Controls */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', background: 'var(--bg-primary)', padding: '8px 12px', borderRadius: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-color)' }}>Po Item Mapping</span>
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={shadeEnabled} onChange={() => setShadeEnabled(!shadeEnabled)} style={{ width: '14px', height: '14px' }} />
-                    Shade
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={gstEnabled} onChange={() => setGstEnabled(!gstEnabled)} style={{ width: '14px', height: '14px' }} />
-                    Tax (GST)
-                  </label>
-                  {gstEnabled && (
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', gap: '3px' }}>
-                        {[12, 18, 28].map(p => (
-                          <button
-                            key={p}
-                            className={`preset-pill ${gstPercentage === p ? 'active' : ''}`}
-                            onClick={() => setGstPercentage(p)}
-                            style={{ padding: '2px 6px', fontSize: '9px', borderRadius: '10px' }}
-                          >
-                            {p}%
-                          </button>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        <input
-                          type="number"
-                          value={![12, 18, 28].includes(gstPercentage) ? gstPercentage : ''}
-                          onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            setGstPercentage(isNaN(val) ? 0 : val);
-                          }}
-                          placeholder="Custom"
-                          style={{
-                            width: '52px',
-                            height: '22px',
-                            padding: '2px 4px',
-                            fontSize: '10px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border-color)',
-                            textAlign: 'right',
-                            background: 'var(--bg-secondary)',
-                            color: 'var(--text-main)'
-                          }}
-                        />
-                        <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)' }}>%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '1.5px solid var(--border-color)', color: 'var(--text-muted)', textAlign: 'left', fontWeight: '800' }}>
+                  <th style={{ padding: '12px 10px' }}>PO Reference</th>
+                  <th style={{ padding: '12px 10px' }}>Date Issued</th>
+                  <th style={{ padding: '12px 10px' }}>Vendor / Supplier</th>
+                  <th style={{ padding: '12px 10px' }}>Design Lot</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'right' }}>Total Value</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const filtered = pos.filter(po => {
+                    const q = poSearchQuery.toLowerCase().trim();
+                    if (!q) return true;
+                    return (
+                      (po.poNumber || '').toLowerCase().includes(q) ||
+                      (po.vendorName || '').toLowerCase().includes(q) ||
+                      (po.designName || '').toLowerCase().includes(q)
+                    );
+                  });
 
-              {/* Paper Items Table */}
-              <div className="custom-table-container">
-                <table className="custom-table" style={{ background: 'transparent' }}>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '30px', textAlign: 'center', padding: '10px 8px' }}>#</th>
-                      <th style={{ width: '130px', padding: '10px 8px' }}>Dept *</th>
-                      <th style={{ padding: '10px 8px' }}>Description *</th>
-                      {shadeEnabled && <th style={{ width: '110px', padding: '10px 8px' }}>Shade</th>}
-                      <th style={{ width: '80px', textAlign: 'center', padding: '10px 8px' }}>UOM *</th>
-                      <th style={{ width: '80px', textAlign: 'right', padding: '10px 8px' }}>Qty *</th>
-                      <th style={{ width: '80px', textAlign: 'right', padding: '10px 8px' }}>Rate (₹)</th>
-                      <th style={{ width: '90px', textAlign: 'right', padding: '10px 8px' }}>Amount</th>
-                      <th style={{ width: '30px', textAlign: 'center', padding: '10px 8px' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, idx) => {
-                      const rowAmt = (+row.qty || 0) * (+row.rate || 0);
-                      
-                      let dropdownOptions = [];
-                      const designItems = (designs || []).flatMap(d => d.bom || []);
-                      
-                      if (row.department) {
-                        const deptLower = row.department.toLowerCase().trim();
-                        const sheetItems = itemsByDept[row.department] || [];
-                        const bomItems = designItems
-                          .filter(item => (item.category || 'Trims').toLowerCase().trim() === deptLower)
-                          .map(item => item.name);
-                        const catItems = (materials || [])
-                          .filter(m => (m.category || 'Trims').toLowerCase().trim() === deptLower)
-                          .map(m => m.name);
-                        dropdownOptions = [...sheetItems, ...bomItems, ...catItems];
-                      } else {
-                        const sheetItems = sheetRows.map(r => r.item).filter(Boolean);
-                        const bomItems = designItems.map(item => item.name);
-                        const catItems = (materials || []).map(m => m.name);
-                        dropdownOptions = [...sheetItems, ...bomItems, ...catItems];
-                      }
-                      
-                      const cleanDropdownOptions = Array.from(new Set(dropdownOptions.filter(Boolean)));
-                      const finalOptions = Array.from(new Set([...cleanDropdownOptions, ...savedDescriptions])).sort((a, b) => a.localeCompare(b));
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan="7" style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          No Purchase Order logs found.
+                        </td>
+                      </tr>
+                    );
+                  }
 
-                      return (
-                        <tr key={idx}>
-                          <td style={{ textAlign: 'center', fontWeight: '600', color: 'var(--text-muted)', padding: '8px' }}>{idx + 1}</td>
-                          <td style={{ padding: '8px' }}>
-                            <select
-                              value={row.department}
-                              onChange={e => {
-                                const newDept = e.target.value;
-                                const matchedRow = sheetRows.find(r => String(r.item).toLowerCase().trim() === String(row.description).toLowerCase().trim());
-                                const keepDescription = matchedRow && matchedRow.dept === newDept;
-                                updateRow(idx, { department: newDept, description: keepDescription ? row.description : "" });
-                              }}
-                              style={{ padding: '4px 6px', fontSize: '12px' }}
-                            >
-                              <option value="">Dept</option>
-                              {departments.map(d => (
-                                <option key={d} value={d}>{d}</option>
-                              ))}
-                              <option value="Trims">Trims</option>
-                              <option value="Fabric">Fabric</option>
-                              <option value="Packaging">Packaging</option>
-                            </select>
-                          </td>
-                          <td style={{ padding: '8px' }}>
-                            <SmartDropdown
-                              value={row.description}
-                              onChange={val => {
-                                const matchedRow = sheetRows.find(r => String(r.item).toLowerCase().trim() === String(val).toLowerCase().trim());
-                                const extraUpdate = {};
-                                if (matchedRow && matchedRow.dept) {
-                                  extraUpdate.department = matchedRow.dept;
-                                }
-                                updateRow(idx, { description: val, ...extraUpdate });
-                                saveDescriptionWithDebounce(val);
-                              }}
-                              options={finalOptions}
-                              placeholder="Type item..."
-                              localStorageKey={LOCAL_STORAGE_KEYS.DESCRIPTIONS}
-                              onSaveToLocalStorage={() => setSavedDescriptions(getLocalStorageItem(LOCAL_STORAGE_KEYS.DESCRIPTIONS, []))}
-                              required
-                            />
-                          </td>
-                          {shadeEnabled && (
-                            <td style={{ padding: '8px' }}>
-                              <SmartDropdown
-                                value={row.shade}
-                                onChange={val => {
-                                  updateRow(idx, { shade: val });
-                                  saveShadeWithDebounce(val);
-                                }}
-                                options={savedShades}
-                                placeholder="Color"
-                                localStorageKey={LOCAL_STORAGE_KEYS.SHADES}
-                                onSaveToLocalStorage={() => setSavedShades(getLocalStorageItem(LOCAL_STORAGE_KEYS.SHADES, []))}
-                              />
-                            </td>
+                  return filtered.map(po => {
+                    return (
+                      <tr key={po.id} style={{ borderBottom: '1px solid var(--border-color)', transition: 'background 0.15s' }}>
+                        <td style={{ padding: '12px 10px', fontWeight: '700', color: 'var(--accent-color)' }}>{po.poNumber}</td>
+                        <td style={{ padding: '12px 10px', color: 'var(--text-main)' }}>{po.date || 'N/A'}</td>
+                        <td style={{ padding: '12px 10px', fontWeight: '600', color: 'var(--text-main)' }}>{po.vendorName || 'N/A'}</td>
+                        <td style={{ padding: '12px 10px', color: 'var(--text-muted)' }}>
+                          {po.designName && po.designName !== 'Custom PO' ? (
+                            <span className="badge" style={{ backgroundColor: 'var(--accent-light)', color: 'var(--accent-color)', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', fontSize: '10px' }}>
+                              {po.designName}
+                            </span>
+                          ) : (
+                            <span style={{ fontStyle: 'italic' }}>General PO</span>
                           )}
-                          <td style={{ padding: '8px' }}>
-                            <select
-                              value={row.uom}
-                              onChange={e => updateRow(idx, { uom: e.target.value })}
-                              style={{ padding: '4px 6px', fontSize: '12px' }}
-                            >
-                              <option value="">UOM</option>
-                              {UOM_OPTIONS.map(u => (
-                                <option key={u} value={u}>{u}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={{ padding: '8px' }}>
-                            <input
-                              type="number"
-                              value={row.qty || ""}
-                              onChange={e => updateRow(idx, { qty: parseFloat(e.target.value) || 0 })}
-                              style={{ textAlign: 'right', padding: '4px 6px', fontSize: '12px' }}
-                              placeholder="0"
-                              min="0"
-                              required
-                            />
-                          </td>
-                          <td style={{ padding: '8px' }}>
-                            <input
-                              type="number"
-                              value={row.rate || ""}
-                              onChange={e => updateRow(idx, { rate: parseFloat(e.target.value) || 0 })}
-                              style={{ textAlign: 'right', padding: '4px 6px', fontSize: '12px' }}
-                              placeholder="0.00"
-                              min="0"
-                            />
-                          </td>
-                          <td style={{ textAlign: 'right', fontWeight: '700', color: 'var(--text-main)', fontSize: '12px', padding: '8px' }}>
-                            ₹{fmtMoney(rowAmt)}
-                          </td>
-                          <td style={{ textAlign: 'center', padding: '8px' }}>
+                        </td>
+                        <td style={{ padding: '12px 10px', textAlign: 'right', fontWeight: '700', color: 'var(--text-main)' }}>
+                          {currencySymbol}{fmtMoney(po.total)}
+                        </td>
+                        <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '3px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '700',
+                            backgroundColor: po.status === 'Received Done' || po.status === 'Completed' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(99, 102, 241, 0.12)',
+                            color: po.status === 'Received Done' || po.status === 'Completed' ? '#10b981' : 'var(--accent-color)'
+                          }}>
+                            {po.status || 'Sent to Vendor'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 10px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
                             <button
+                              type="button"
                               className="btn btn-secondary btn-sm"
-                              onClick={() => removeRow(idx)}
-                              style={{ background: 'none', border: 'none', padding: 0, color: 'var(--danger)' }}
+                              onClick={() => handleLoadPOFromHistory(po.poNumber)}
+                              style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', height: '26px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Load PO details into active editor"
                             >
-                              <Trash2 size={14} />
+                              <PlusCircle size={12} /> Load
                             </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <button
-                className="btn btn-secondary"
-                onClick={addRow}
-                style={{ border: '1.5px dashed var(--border-color)', background: 'none', width: '100%', padding: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--accent-color)', marginTop: '10px', borderRadius: '8px', fontSize: '12px' }}
-              >
-                <PlusCircle size={14} /> Add New PO Item
-              </button>
-            </div>
-
-            <div>
-              {/* Calculations & Signatures footer inside paper */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', borderTop: '2px solid var(--text-main)', paddingTop: '14px', marginTop: '20px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dashed var(--border-color)' }}>
-                    <span>Subtotal:</span>
-                    <strong>₹{fmtMoney(totals.sub)}</strong>
-                  </div>
-                  {gstEnabled && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px dashed var(--border-color)' }}>
-                      <span>GST ({gstPercentage}%):</span>
-                      <strong>₹{fmtMoney(totals.gstAmount)}</strong>
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '15px', color: 'var(--accent-color)' }}>
-                    <span>Grand Total:</span>
-                    <strong style={{ fontSize: '17px', fontWeight: '800' }}>₹{fmtMoney(totals.grandTotal)}</strong>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center' }}>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => setShowSupervisorDialog(true)}
-                    disabled={isSubmitting}
-                    style={{ width: '100%', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '13px', borderRadius: '8px' }}
-                  >
-                    {isSubmitting ? 'Saving PO...' : <><CheckCircle size={16} /> Confirm & Save PO</>}
-                  </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={handleDownloadPdfPreview}
-                    style={{ width: '100%', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '12px', borderRadius: '8px' }}
-                  >
-                    <Download size={14} /> PDF Preview
-                  </button>
-                </div>
-              </div>
-
-              {/* Dynamic signatures drawn on paper */}
-              <div className="paper-signatures">
-                <div className="sig-box">
-                  <div>Raised By:</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '12px', marginTop: '4px' }}>{requisitionRaisedBy || '________'}</div>
-                  <div className="sig-line"></div>
-                  <div>Signature & Date</div>
-                </div>
-                <div className="sig-box">
-                  <div>Prepared By:</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '12px', marginTop: '4px' }}>{preparedBy || '________'}</div>
-                  <div className="sig-line"></div>
-                  <div>Signature & Date</div>
-                </div>
-                <div className="sig-box">
-                  <div>Approved By:</div>
-                  <div style={{ color: 'var(--text-main)', fontWeight: '700', fontSize: '12px', marginTop: '4px' }}>{approvedBy || '________'}</div>
-                  <div className="sig-line"></div>
-                  <div>Signature & Date</div>
-                </div>
-              </div>
-            </div>
-
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleDownloadPOFromHistory(po)}
+                              style={{ padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', height: '26px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                              title="Download Purchase Order PDF"
+                            >
+                              <Download size={12} /> PDF
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })()}
+              </tbody>
+            </table>
           </div>
         </div>
-
-      </div>
+      )}
 
       {/* MODAL: Load PO Form Sheet dialog */}
       {showLoadDialog && (
@@ -2502,9 +2821,9 @@ export default function GeneratePOView({
                   <option key={no} value={no}>{no}</option>
                 ))}
               </select>
-              
+
               <div style={{ textAlign: 'center', margin: '4px 0 12px 0', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>— OR TYPE MANUALLY —</div>
-              
+
               <label className="FormLabel">Enter PO Reference Number</label>
               <input
                 type="text"

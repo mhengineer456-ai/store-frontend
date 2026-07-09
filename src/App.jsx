@@ -229,7 +229,8 @@ const hasTabAccess = (tabName, role) => {
       'reports_history',
       'settings',
       'approval_queue',
-      'po_verification'
+      'po_verification',
+      're_download'
     ].includes(tabName);
   }
   if (panel === 'designer') {
@@ -610,7 +611,7 @@ export default function App() {
       if (!AudioContext) return;
       const ctx = new AudioContext();
       const now = ctx.currentTime;
-      
+
       const osc1 = ctx.createOscillator();
       const gain1 = ctx.createGain();
       osc1.type = 'sine';
@@ -1532,7 +1533,7 @@ export default function App() {
             background: 'radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, rgba(99, 102, 241, 0) 70%)',
             animation: 'pulseGlow 2s infinite ease-in-out'
           }} />
-          
+
           <div style={{
             width: '80px',
             height: '80px',
@@ -1685,8 +1686,8 @@ export default function App() {
       )}
       {/* Sidebar Overlay for Mobile */}
       {isSidebarOpen && (
-        <div 
-          className="sidebar-overlay" 
+        <div
+          className="sidebar-overlay"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
@@ -1954,6 +1955,10 @@ export default function App() {
                   <SettingsIcon size={18} />
                   <span className="sidebar-text">Setting</span>
                 </li>
+                <li className={`sidebar-item ${activeTab === 're_download' ? 'active' : ''}`} onClick={() => setActiveTab('re_download')}>
+                  <Download size={18} />
+                  <span className="sidebar-text">Re-Download Options</span>
+                </li>
                 <li className={`sidebar-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
                   <History size={18} />
                   <span className="sidebar-text">Production Work</span>
@@ -2110,9 +2115,9 @@ export default function App() {
                   </div>
 
                   {(() => {
-                    const pendingVerifications = approvalRequests.filter(req => 
-                      req.type === 'design_verification' && 
-                      req.status === 'pending' && 
+                    const pendingVerifications = approvalRequests.filter(req =>
+                      req.type === 'design_verification' &&
+                      req.status === 'pending' &&
                       !dismissedNotifications.includes(req.id)
                     );
                     if (pendingVerifications.length === 0) {
