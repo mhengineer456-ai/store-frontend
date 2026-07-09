@@ -3,6 +3,7 @@ import {
   ArrowLeftRight, Search, Package, MapPin, CheckCircle,
   AlertTriangle, Clock, User, Calendar, RefreshCw, Printer, ArrowLeft
 } from 'lucide-react';
+import { getBackendUrl } from '../utils/api';
 
 function SearchableMaterialSelect({ materials, value, onChange, placeholder = "— Select Material to Transfer —" }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -159,12 +160,12 @@ export default function MaterialTransferView({ currentUser }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const matRes = await fetch('http://localhost:5000/api/materials');
+      const matRes = await fetch(`${getBackendUrl()}/api/materials`);
       if (matRes.ok) {
         const matData = await matRes.json();
         setMaterials(matData);
       }
-      const transRes = await fetch('http://localhost:5000/api/transfers');
+      const transRes = await fetch(`${getBackendUrl()}/api/transfers`);
       if (transRes.ok) {
         const transData = await transRes.json();
         setHistory(transData);
@@ -296,7 +297,7 @@ export default function MaterialTransferView({ currentUser }) {
         color: newLocSummary
       };
 
-      const putRes = await fetch(`http://localhost:5000/api/materials/${selectedMaterialId}`, {
+      const putRes = await fetch(`${getBackendUrl()}/api/materials/${selectedMaterialId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedMaterial)
@@ -315,7 +316,7 @@ export default function MaterialTransferView({ currentUser }) {
         operator: currentUser?.name || 'Admin'
       };
 
-      const logRes = await fetch('http://localhost:5000/api/transfers', {
+      const logRes = await fetch(`${getBackendUrl()}/api/transfers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(logPayload)

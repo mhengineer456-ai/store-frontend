@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Layers, FileSpreadsheet, PlusCircle, AlertCircle, TrendingDown, DollarSign, Search, Printer, Barcode, ChevronDown, ChevronUp, Trash2, ClipboardCheck, CheckCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getBackendUrl } from '../utils/api';
 
 // Barcode Renderer Component (Guaranteed crisp black/white Code-128 visual style, 0% bar overlap)
 const BarcodeVisual = ({ code }) => {
@@ -282,7 +283,7 @@ export default function MaterialDetailsView({
         .then(() => handleSuccess())
         .catch(() => handleSuccess()); // fallback for non-promise responses
     } else {
-      fetch(`http://localhost:5000/api/materials/${material.id}`, {
+      fetch(`${getBackendUrl()}/api/materials/${material.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedMaterial)

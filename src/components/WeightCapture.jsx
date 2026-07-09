@@ -106,6 +106,20 @@ export default function WeightCapture({ racks = [] }) {
     remarks: '',
   });
 
+  const [metadataFlash, setMetadataFlash] = useState(false);
+
+  const areDetailsFilled = () => {
+    return (
+      (form.materialName || '').trim() !== '' &&
+      (form.category || '').trim() !== '' &&
+      (form.supplier || '').trim() !== '' &&
+      (form.poNumber || '').trim() !== '' &&
+      (form.invoiceNo || '').trim() !== '' &&
+      (form.storeLocation || '').trim() !== '' &&
+      (form.storeIncharge || '').trim() !== ''
+    );
+  };
+
   // Get specific location for 1-indexed packet (e.g. Packet #3 out of 10)
   const getPacketLocationForIndex = (packetNo) => {
     if (locationMode === 'same' || !locationGroups || locationGroups.length === 0) {
@@ -397,6 +411,12 @@ export default function WeightCapture({ racks = [] }) {
   };
 
   const handleWeighSample = (qty) => {
+    if (!areDetailsFilled()) {
+      showToast('⚠️ Please fill in all Metadata Details first before weighing samples!', 'error');
+      setMetadataFlash(true);
+      setTimeout(() => setMetadataFlash(false), 2000);
+      return;
+    }
     if (!connected) {
       showToast('Scale must be connected to weigh samples.', 'error');
       return;
@@ -412,6 +432,12 @@ export default function WeightCapture({ racks = [] }) {
   };
 
   const handleCalibrateWPP = () => {
+    if (!areDetailsFilled()) {
+      showToast('⚠️ Please fill in all Metadata Details first before calibrating!', 'error');
+      setMetadataFlash(true);
+      setTimeout(() => setMetadataFlash(false), 2000);
+      return;
+    }
     if (sampleWeightKg <= 0) {
       showToast('Please capture sample weight first.', 'error');
       return;
@@ -591,6 +617,21 @@ export default function WeightCapture({ racks = [] }) {
         showToast('Could not connect to print service.', 'error');
       }
     }, 1000);
+  };
+
+
+  const handleSaveClick = () => {
+    if (!areDetailsFilled()) {
+      showToast('⚠️ Please fill in all required Metadata Details before saving!', 'error');
+      setMetadataFlash(true);
+      setTimeout(() => setMetadataFlash(false), 2000);
+      return;
+    }
+    if (sampleWeightKg <= 0 || !wppLocked) {
+      showToast('⚠️ Please calibrate the sample piece weight first before saving!', 'error');
+      return;
+    }
+    setSaveDialog(true);
   };
 
 
@@ -863,6 +904,95 @@ export default function WeightCapture({ racks = [] }) {
             Print service disconnected. Run: <code style={{ background: 'rgba(0,0,0,0.06)', padding: '2px 6px', borderRadius: '4px' }}>python print_service.py</code>
           </div>
         )}
+      </div>
+
+      {/* ── WORKFLOW INSTRUCTIONS BANNER ── */}
+      <div className="panel" style={{
+        padding: '20px 24px',
+        borderRadius: '12px',
+        border: '1.5px solid var(--border-color)',
+        marginBottom: '20px',
+        background: 'var(--bg-secondary)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
+      }}>
+        <h3 style={{ fontSize: '15px', fontWeight: '900', color: 'var(--text-main)', margin: '0 0 14px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          📋 Operating Instructions: Step-by-Step Material Add Workflow
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+          {/* Step 1 */}
+          <div style={{
+            padding: '12px 14px', borderRadius: '8px', border: `1.5px solid ${areDetailsFilled() ? '#10b981' : 'var(--border-color)'}`,
+            background: areDetailsFilled() ? 'rgba(16,185,129,0.06)' : 'var(--bg-primary)', transition: 'all 0.3s'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{
+                display: 'inline-flex', width: '20px', height: '20px', borderRadius: '50%',
+                backgroundColor: areDetailsFilled() ? '#10b981' : 'var(--accent-color)', color: '#fff',
+                fontSize: '11px', fontWeight: '800', alignItems: 'center', justifyContent: 'center', marginRight: '8px'
+              }}>1</span>
+              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>Fill Metadata Details</span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Fill in all fields with red asterisk (*) in the <strong>Metadata Details</strong> form first.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div style={{
+            padding: '12px 14px', borderRadius: '8px', border: `1.5px solid ${wppLocked ? '#10b981' : (areDetailsFilled() ? 'var(--accent-color)' : 'var(--border-color)')}`,
+            background: wppLocked ? 'rgba(16,185,129,0.06)' : 'var(--bg-primary)', transition: 'all 0.3s',
+            opacity: areDetailsFilled() ? 1 : 0.6
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{
+                display: 'inline-flex', width: '20px', height: '20px', borderRadius: '50%',
+                backgroundColor: wppLocked ? '#10b981' : (areDetailsFilled() ? 'var(--accent-color)' : '#94a3b8'), color: '#fff',
+                fontSize: '11px', fontWeight: '800', alignItems: 'center', justifyContent: 'center', marginRight: '8px'
+              }}>2</span>
+              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>Calibrate Sample Weight</span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Weigh sample (e.g. 10 pcs), click <strong>Weigh Pcs</strong>, then <strong>Calibrate Avg Wt</strong> to lock.
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div style={{
+            padding: '12px 14px', borderRadius: '8px', border: `1.5px solid ${weightConfirmed ? '#10b981' : (wppLocked ? 'var(--accent-color)' : 'var(--border-color)')}`,
+            background: weightConfirmed ? 'rgba(16,185,129,0.06)' : 'var(--bg-primary)', transition: 'all 0.3s',
+            opacity: wppLocked ? 1 : 0.6
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{
+                display: 'inline-flex', width: '20px', height: '20px', borderRadius: '50%',
+                backgroundColor: weightConfirmed ? '#10b981' : (wppLocked ? 'var(--accent-color)' : '#94a3b8'), color: '#fff',
+                fontSize: '11px', fontWeight: '800', alignItems: 'center', justifyContent: 'center', marginRight: '8px'
+              }}>3</span>
+              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>Weigh Bulk Packets</span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Place bulk roll/packets on scale. Total count calculates automatically. Confirm bulk weight.
+            </p>
+          </div>
+
+          {/* Step 4 */}
+          <div style={{
+            padding: '12px 14px', borderRadius: '8px', border: `1.5px solid ${saveDialog ? '#10b981' : 'var(--border-color)'}`,
+            background: 'var(--bg-primary)', opacity: wppLocked ? 1 : 0.6
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{
+                display: 'inline-flex', width: '20px', height: '20px', borderRadius: '50%',
+                backgroundColor: wppLocked ? 'var(--accent-color)' : '#94a3b8', color: '#fff',
+                fontSize: '11px', fontWeight: '800', alignItems: 'center', justifyContent: 'center', marginRight: '8px'
+              }}>4</span>
+              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>Save & Print Add</span>
+            </div>
+            <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.4' }}>
+              Verify total packets, location, then click <strong>Save & Print Material Add</strong> to finalize.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* ── MAIN 2-COLUMN GRID LAYOUT ──────────────────────────────────── */}
@@ -1194,7 +1324,15 @@ export default function WeightCapture({ racks = [] }) {
           </div>
 
           {/* Metadata Details Form */}
-          <div className="panel" style={{ margin: 0, padding: '24px', borderRadius: '12px', border: '1.5px solid #cbd5e1', boxShadow: '0 4px 16px rgba(0,0,0,0.05)' }}>
+          <div className="panel" style={{
+            margin: 0,
+            padding: '24px',
+            borderRadius: '12px',
+            border: metadataFlash ? '2px solid #ef4444' : '1.5px solid #cbd5e1',
+            boxShadow: metadataFlash ? '0 0 20px rgba(239, 68, 68, 0.4)' : '0 4px 16px rgba(0,0,0,0.05)',
+            transform: metadataFlash ? 'scale(1.01)' : 'scale(1)',
+            transition: 'all 0.3s ease'
+          }}>
             <h3 style={{ fontSize: '15px', fontWeight: '900', margin: '0 0 18px 0', color: '#0f172a', letterSpacing: '0.2px' }}>
               Roll / Item Metadata Details
             </h3>
@@ -1317,7 +1455,7 @@ export default function WeightCapture({ racks = [] }) {
             <div style={{ marginTop: '22px' }}>
               <button
                 type="button"
-                onClick={() => setSaveDialog(true)}
+                onClick={handleSaveClick}
                 style={{
                   width: '100%',
                   padding: '14px 20px',

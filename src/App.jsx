@@ -389,6 +389,15 @@ export default function App() {
   const [isNewDesignModalOpen, setIsNewDesignModalOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  const [dismissedNotifications, setDismissedNotifications] = useState(() => {
+    const saved = localStorage.getItem('dismissed_notifications');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dismissed_notifications', JSON.stringify(dismissedNotifications));
+  }, [dismissedNotifications]);
+
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   // Issue logs — backed by database
   const [issueLogs, setIssueLogs] = useState([]);
@@ -585,6 +594,45 @@ export default function App() {
     const pollInterval = setInterval(fetchApprovalRequests, 5000);
     return () => clearInterval(pollInterval);
   }, []);
+
+  const playNotificationSound = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+      
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(523.25, now);
+      gain1.gain.setValueAtTime(0.12, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.4);
+
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(659.25, now + 0.1);
+      gain2.gain.setValueAtTime(0.12, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.1);
+      osc2.stop(now + 0.5);
+    } catch (e) {
+      console.error('Failed to play web audio notification:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (toast) {
+      playNotificationSound();
+    }
+  }, [toast]);
 
   const prevRequestsRef = useRef([]);
 
@@ -1366,11 +1414,12 @@ export default function App() {
       detail: ''
     }));
 
-    // Auto-increment Lot Number (Design ID) starting at 11000 — Lot No IS the name
+    // Auto-increment Lot Number (Design ID) starting at 30000 — Lot No IS the name
     const numericIds = designs
       .map(d => parseInt(d.id, 10))
-      .filter(id => !isNaN(id));
-    const nextId = numericIds.length > 0 ? Math.max(...numericIds) + 1 : 11000;
+      .filter(id => !isNaN(id) && id >= 30000 && id < 60000);
+    const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+    const nextId = maxId >= 30000 ? maxId + 1 : 30000;
 
     const finalId = mLotNo.trim() || String(nextId);
 
@@ -1900,7 +1949,7 @@ export default function App() {
                 title="Notifications"
               >
                 <Bell size={18} />
-                {approvalRequests.filter(req => req.type === 'design_verification' && req.status === 'pending').length > 0 && (
+                {approvalRequests.filter(req => req.type === 'design_verification' && req.status === 'pending' && !dismissedNotifications.includes(req.id)).length > 0 && (
                   <span style={{
                     position: 'absolute',
                     top: '-2px',
@@ -1916,7 +1965,7 @@ export default function App() {
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    {approvalRequests.filter(req => req.type === 'design_verification' && req.status === 'pending').length}
+                    {approvalRequests.filter(req => req.type === 'design_verification' && req.status === 'pending' && !dismissedNotifications.includes(req.id)).length}
                   </span>
                 )}
               </button>
@@ -1949,7 +1998,11 @@ export default function App() {
                   </div>
 
                   {(() => {
-                    const pendingVerifications = approvalRequests.filter(req => req.type === 'design_verification' && req.status === 'pending');
+                    const pendingVerifications = approvalRequests.filter(req => 
+                      req.type === 'design_verification' && 
+                      req.status === 'pending' && 
+                      !dismissedNotifications.includes(req.id)
+                    );
                     if (pendingVerifications.length === 0) {
                       return (
                         <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
@@ -1974,13 +2027,39 @@ export default function App() {
                               backgroundColor: 'var(--bg-secondary)',
                               borderLeft: '3.5px solid var(--accent-color)',
                               cursor: currentUser.role === 'Admin' ? 'pointer' : 'default',
-                              textAlign: 'left'
+                              textAlign: 'left',
+                              position: 'relative'
                             }}
                           >
-                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDismissedNotifications(prev => [...prev, req.id]);
+                              }}
+                              style={{
+                                position: 'absolute',
+                                top: '8px',
+                                right: '8px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                cursor: 'pointer',
+                                padding: '2px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '50%',
+                                transition: 'background-color 0.2s'
+                              }}
+                              title="Dismiss notification"
+                            >
+                              <X size={12} />
+                            </button>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)', paddingRight: '20px' }}>
                               {req.requesterName} created a design
                             </div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', paddingRight: '20px' }}>
                               Please verify design Lot No: {req.lotId}
                             </div>
                             <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'right' }}>
@@ -2246,8 +2325,9 @@ export default function App() {
                   <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Auto Lot No</span>
                   <span style={{ fontFamily: 'var(--font-family-title)', fontSize: '24px', fontWeight: '800', color: 'var(--accent-color)', lineHeight: 1.2 }}>
                     {(() => {
-                      const ids = designs.map(d => parseInt(d.id, 10)).filter(id => !isNaN(id));
-                      return ids.length > 0 ? Math.max(...ids) + 1 : 11000;
+                      const ids = designs.map(d => parseInt(d.id, 10)).filter(id => !isNaN(id) && id >= 30000 && id < 60000);
+                      const maxId = ids.length > 0 ? Math.max(...ids) : 0;
+                      return maxId >= 30000 ? maxId + 1 : 30000;
                     })()}
                   </span>
                 </div>

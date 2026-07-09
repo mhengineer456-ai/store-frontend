@@ -330,8 +330,9 @@ export default function DesignView({
 
   // Auto-calculate next Lot No for preview in form
   const getNextLotNo = () => {
-    const numericIds = designs.map(d => parseInt(d.id, 10)).filter(id => !isNaN(id));
-    return numericIds.length > 0 ? Math.max(...numericIds) + 1 : 11000;
+    const numericIds = designs.map(d => parseInt(d.id, 10)).filter(id => !isNaN(id) && id >= 30000 && id < 60000);
+    const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+    return maxId >= 30000 ? maxId + 1 : 30000;
   };
 
   // New design form state (no name — Lot No IS the name)

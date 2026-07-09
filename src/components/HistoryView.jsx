@@ -959,7 +959,7 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
   // Helper function to resolve dynamic design image preview URLs
   const getCleanImageUrl = (url) => {
     if (!url) return '';
-    return url.replace('https://store-backend-1-ff8d.onrender.com', `${getBackendUrl()}`);
+    return url.replace('wait', `${getBackendUrl()}`);
   };
 
   return (
