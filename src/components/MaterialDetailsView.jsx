@@ -141,7 +141,10 @@ export default function MaterialDetailsView({
 
   // WebSocket print service connection state
   const [printServiceStatus, setPrintServiceStatus] = useState('disconnected');
+  const [printerName, setPrinterName] = useState('');
   const wsRef = useRef(null);
+
+  const connectRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -183,6 +186,11 @@ export default function MaterialDetailsView({
         try {
           const res = JSON.parse(e.data);
           console.log("Print Service Response:", res);
+          if (res.type === 'auth_success') {
+            socket.send(JSON.stringify({ type: 'status' }));
+          } else if (res.type === 'status') {
+            setPrinterName(res.printerName || 'USB Printer');
+          }
         } catch (err) {
           console.error("Error parsing message:", err);
         }
@@ -190,6 +198,7 @@ export default function MaterialDetailsView({
     };
 
     connect();
+    connectRef.current = connect;
 
     return () => {
       active = false;
@@ -324,7 +333,7 @@ export default function MaterialDetailsView({
     return generated;
   };
 
-  const handlePrintBarcodes = (barcodesList, material) => {
+  const handlePrintBarcodes = async (barcodesList, material) => {
     if (!barcodesList || barcodesList.length === 0) return;
 
     const totalPkts = barcodesList.length;
@@ -335,6 +344,18 @@ export default function MaterialDetailsView({
       d.getFullYear() + ' ' +
       String(d.getHours()).padStart(2, '0') + ':' +
       String(d.getMinutes()).padStart(2, '0');
+
+    let matchingCaptures = [];
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/weight-capture`);
+      if (res.ok) {
+        const result = await res.json();
+        const captures = result.data || [];
+        matchingCaptures = captures.filter(c => String(c.materialCode) === String(material.id));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch weight captures for barcodes printing:", err);
+    }
 
     // Attempt direct WebSocket connection to Python print_service.py (ws://localhost:8765)
     try {
@@ -350,22 +371,34 @@ export default function MaterialDetailsView({
         const pktBarcodeId = `${material.id}-A${String(rollNum).padStart(2, '0')}`;
 
         const pktQty = Math.round((material.stock / totalPkts) * 100) / 100;
+
+        const capture = matchingCaptures.find(c => c.barcodeId === pktBarcodeId)
+          || matchingCaptures[rollNum - 1]
+          || matchingCaptures[0];
+
+        const displayWeight = capture ? `${capture.netWeightKg} KG` : `${pktQty} ${material.unit || 'Pcs'}`;
+        const displayPieces = capture ? String(capture.pieces) : String(pktQty);
+        const displayTotalQty = capture ? `${capture.pieces} ${material.unit || 'Pcs'}` : `${material.stock} ${material.unit || 'Pcs'}`;
+        const displayPo = capture?.poNumber || material.poNumber || material.po || 'N/A';
+        const displayBill = capture?.invoiceNo || material.invoiceNo || material.billNo || 'N/A';
+        const displayCmp = capture?.supplier || material.supplier || 'paras';
+
         const payload = {
           type: 'print_accessory',
           data: {
-            cmp: material.supplier || 'paras',
+            cmp: displayCmp,
             materialName: material.name,
             materialCode: material.id,
             category: material.category || 'Accessory',
             shade: material.color || 'Default',
-            weight: `${pktQty} ${material.unit || 'Pcs'}`,
-            pieces: String(pktQty),
-            totalQty: `${material.stock} ${material.unit || 'Pcs'}`,
+            weight: displayWeight,
+            pieces: displayPieces,
+            totalQty: displayTotalQty,
             unit: material.unit || 'Pcs',
             location: pktLoc,
             date: printDate,
-            poNumber: material.poNumber || material.po || 'N/A',
-            billNo: material.invoiceNo || material.billNo || 'N/A',
+            poNumber: displayPo,
+            billNo: displayBill,
             lotNo: material.id,
             operator: currentUser?.name || 'Paras',
             authorized: currentUser?.name || 'Paras',
@@ -692,19 +725,24 @@ export default function MaterialDetailsView({
           </h3>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }} className="print-hide">
             {/* Print Service Connection Status */}
-            <span style={{ 
-              fontSize: '11px', 
-              fontWeight: '600', 
-              color: printServiceStatus === 'connected' ? 'var(--success)' : printServiceStatus === 'connecting' ? 'var(--warning)' : 'var(--text-light)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              backgroundColor: 'var(--bg-primary)',
-              padding: '4px 10px',
-              borderRadius: '20px',
-              border: '1px solid var(--border-color)',
-              marginRight: '8px'
-            }}>
+            <button
+              onClick={() => connectRef.current && connectRef.current()}
+              style={{ 
+                fontSize: '11px', 
+                fontWeight: '600', 
+                color: printServiceStatus === 'connected' ? 'var(--success)' : printServiceStatus === 'connecting' ? 'var(--warning)' : 'var(--text-light)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'var(--bg-primary)',
+                padding: '4px 10px',
+                borderRadius: '20px',
+                border: '1px solid var(--border-color)',
+                marginRight: '8px',
+                cursor: 'pointer'
+              }}
+              title="Click to reconnect print service"
+            >
               <span style={{ 
                 width: '6px', 
                 height: '6px', 
@@ -713,12 +751,12 @@ export default function MaterialDetailsView({
                 display: 'inline-block'
               }} />
               {printServiceStatus === 'connected' 
-                ? 'Print Service Connected' 
+                ? `Print Service Connected (${printerName || 'USB Printer'})` 
                 : printServiceStatus === 'connecting' 
                   ? 'Connecting Print Service...' 
                   : 'Print Service Offline (Fallback Dialog)'
               }
-            </span>
+            </button>
             <div style={{ position: 'relative', width: '220px' }}>
               <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
                 <Search size={14} />

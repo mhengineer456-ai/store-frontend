@@ -399,18 +399,21 @@ export default function PublicScanView({ initialAction = '', initialLot = '', in
                       backgroundColor: 
                         scanType === 'gate_entry' ? 'rgba(16, 185, 129, 0.15)' :
                         scanType === 'material_in' ? 'rgba(59, 130, 246, 0.15)' :
+                        scanType === 'printing_gate_out' ? 'rgba(249, 115, 22, 0.15)' :
                         scanType === 'rgp_entry' ? 'rgba(168, 85, 247, 0.15)' :
                         scanType === 'rgp_return' ? 'rgba(236, 72, 153, 0.15)' :
                         'rgba(245, 158, 11, 0.15)',
                       border: 
                         scanType === 'gate_entry' ? '1px solid rgba(16, 185, 129, 0.3)' :
                         scanType === 'material_in' ? '1px solid rgba(59, 130, 246, 0.3)' :
+                        scanType === 'printing_gate_out' ? '1px solid rgba(249, 115, 22, 0.3)' :
                         scanType === 'rgp_entry' ? '1px solid rgba(168, 85, 247, 0.3)' :
                         scanType === 'rgp_return' ? '1px solid rgba(236, 72, 153, 0.3)' :
                         '1px solid rgba(245, 158, 11, 0.3)',
                       color: 
                         scanType === 'gate_entry' ? '#34d399' :
                         scanType === 'material_in' ? '#60a5fa' :
+                        scanType === 'printing_gate_out' ? '#fb923c' :
                         scanType === 'rgp_entry' ? '#c084fc' :
                         scanType === 'rgp_return' ? '#f472b6' :
                         '#fbbf24',
@@ -587,6 +590,7 @@ export default function PublicScanView({ initialAction = '', initialLot = '', in
                       <option value="gate_entry" style={{ background: '#1e293b' }}>Gate Entry</option>
                       <option value="material_in" style={{ background: '#1e293b' }}>Material In</option>
                       <option value="supplier_entry" style={{ background: '#1e293b' }}>Supplier Entry</option>
+                      <option value="printing_gate_out" style={{ background: '#1e293b' }}>Printing Gate Out</option>
                       <option value="rgp_entry" style={{ background: '#1e293b' }}>RGP Out / Issue</option>
                       <option value="rgp_return" style={{ background: '#1e293b' }}>RGP Return</option>
                     </select>

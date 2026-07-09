@@ -2024,20 +2024,41 @@ export function PuneetZipForm({ prefilledLotNo = '', setPrefilledLotNo = () => {
         }
     };
     const initializeZipSelections = async (matrixData, _signal) => {
-        const initialSelections = {};
+        let payload = null;
+        if (matrixData.zipPayload) {
+            try {
+                payload = typeof matrixData.zipPayload === 'string'
+                    ? JSON.parse(matrixData.zipPayload)
+                    : matrixData.zipPayload;
+            } catch (e) {
+                console.warn('Failed to parse zipPayload:', e);
+            }
+        }
 
-        // All shades are always available — every submission creates a NEW row (new SR NO).
-        // Previous orders for the same lot are never overwritten.
+        const initialSelections = {};
         matrixData.rows.forEach(row => {
-            initialSelections[row.color] = '';
+            if (payload && payload.zipSelections && payload.zipSelections[row.color] !== undefined) {
+                initialSelections[row.color] = payload.zipSelections[row.color];
+            } else {
+                initialSelections[row.color] = '';
+            }
         });
 
         setZipSelections(initialSelections);
         setBlockedShades(new Set()); // No shades are ever blocked
 
-        // Initialize with default values
-        setPlacementQuantities({ default: 1 });
-        setPlacementZipTypes({ default: availableZipTypes[0] || '' });
+        if (payload) {
+            if (payload.supervisor) setSupervisor(payload.supervisor);
+            if (payload.priority) setPriority(payload.priority);
+            if (payload.issueDate) setIssueDate(payload.issueDate);
+            if (payload.selectedPlacements) setSelectedPlacements(payload.selectedPlacements);
+            if (payload.placementQuantities) setPlacementQuantities(payload.placementQuantities);
+            if (payload.placementZipTypes) setPlacementZipTypes(payload.placementZipTypes);
+        } else {
+            // Initialize with default values
+            setPlacementQuantities({ default: 1 });
+            setPlacementZipTypes({ default: availableZipTypes[0] || '' });
+        }
     };
 
     const handleClear = () => {

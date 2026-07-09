@@ -1551,6 +1551,8 @@ export default function ReportsHistoryView({
                                               ? { backgroundColor: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', label: 'Gate Entry Check' }
                                               : scan.scan_type === 'material_in'
                                               ? { backgroundColor: 'rgba(16, 185, 129, 0.12)', color: '#10b981', label: 'Store Material In' }
+                                              : scan.scan_type === 'printing_gate_out'
+                                              ? { backgroundColor: 'rgba(249, 115, 22, 0.12)', color: '#f97316', label: 'Printing Gate Out' }
                                               : scan.scan_type === 'rgp_entry'
                                               ? { backgroundColor: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', label: 'RGP Dispatch' }
                                               : { backgroundColor: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', label: 'RGP Return In' };

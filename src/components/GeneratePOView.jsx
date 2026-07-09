@@ -64,14 +64,18 @@ function generateNextPoNumber(existingPoNumbers) {
       if (poStr) {
         const match = poStr.match(/\d+/);
         if (match) {
-          parsedNumbers.push(parseInt(match[0], 10));
+          const num = parseInt(match[0], 10);
+          // Only consider numbers in the 11xxx series range
+          if (num >= 11000 && num < 20000) {
+            parsedNumbers.push(num);
+          }
         }
       }
     });
   }
   
   if (parsedNumbers.length === 0) {
-    return 'PO-1000';
+    return 'PO-11000';
   }
   
   const maxNum = Math.max(...parsedNumbers);
@@ -1129,7 +1133,7 @@ export default function GeneratePOView({
     return logs;
   };
 
-  const [poNumber, setPoNumber] = useState("PO-1000");
+  const [poNumber, setPoNumber] = useState("PO-11000");
   const [orderDate, setOrderDate] = useState(todayISO());
   const [orderTime, setOrderTime] = useState(nowTime());
   const [expectedDate, setExpectedDate] = useState("");
@@ -1484,20 +1488,76 @@ export default function GeneratePOView({
     setIsLoadingPO(true);
     setLoadError("");
     try {
-      const poData = await fetchPODataByNumber(searchPoNumber, SHEET_ID, API_KEY);
-      if (poData && poData.length > 0) {
-        const loadedRows = poData.map(item => ({
-          department: item.department || "",
-          description: item.description || "",
-          shade: "",
-          uom: item.uom || "",
-          qty: item.qty || 0,
-          rate: item.rate || 0
-        }));
-        setRows(loadedRows);
-        setLocalStorageItem(LOCAL_STORAGE_KEYS.LAST_PO_NUMBER, searchPoNumber);
-        alert(`Successfully loaded PO ${searchPoNumber} from sheets.`);
-        setShowLoadDialog(false);
+      // 1. Try local database first
+      let loadedFromLocal = false;
+      try {
+        const backendUrl = getBackendUrl();
+        const res = await fetch(`${backendUrl}/api/pos/${encodeURIComponent(searchPoNumber.trim())}`);
+        if (res.ok) {
+          const po = await res.json();
+          if (po) {
+            setSupplierName(po.vendorName || "");
+            setSupplierEmail(po.vendorEmail || "");
+            setSupplierAddress(po.vendorAddress || "");
+            
+            if (po.date) setOrderDate(po.date);
+            if (po.deliveryDate) setExpectedDate(po.deliveryDate);
+            
+            if (po.items && Array.isArray(po.items)) {
+              setRows(po.items.map(item => {
+                const isMySQL = item.name !== undefined;
+                const desc = isMySQL ? (item.name || "") : (item.description || item.item || "");
+                
+                // Find matching department from sheetRows by looking up description
+                let dept = "";
+                if (desc) {
+                  const matched = sheetRows.find(r => r.item && r.item.toLowerCase().trim() === desc.toLowerCase().trim());
+                  if (matched) {
+                    dept = matched.dept || "";
+                  }
+                }
+                if (!dept) {
+                  dept = item.department || item.dept || "Trims"; // fallback
+                }
+
+                return {
+                  department: dept,
+                  description: desc,
+                  shade: isMySQL ? (item.description || "") : (item.shade || ""),
+                  uom: isMySQL ? (item.unit || "") : (item.uom || ""),
+                  qty: parseFloat(isMySQL ? item.qty : (item.qty || item.quantity)) || 0,
+                  rate: parseFloat(isMySQL ? item.price : (item.rate || item.price)) || 0
+                };
+              }));
+            }
+            
+            loadedFromLocal = true;
+            setLocalStorageItem(LOCAL_STORAGE_KEYS.LAST_PO_NUMBER, searchPoNumber);
+            alert(`Successfully loaded PO ${searchPoNumber} from local database.`);
+            setShowLoadDialog(false);
+          }
+        }
+      } catch (localErr) {
+        console.warn("Failed to load PO from local database:", localErr);
+      }
+
+      // 2. Fallback to Google Sheets if local DB fetch didn't load it
+      if (!loadedFromLocal) {
+        const poData = await fetchPODataByNumber(searchPoNumber, SHEET_ID, API_KEY);
+        if (poData && poData.length > 0) {
+          const loadedRows = poData.map(item => ({
+            department: item.department || "",
+            description: item.description || "",
+            shade: "",
+            uom: item.uom || "",
+            qty: item.qty || 0,
+            rate: item.rate || 0
+          }));
+          setRows(loadedRows);
+          setLocalStorageItem(LOCAL_STORAGE_KEYS.LAST_PO_NUMBER, searchPoNumber);
+          alert(`Successfully loaded PO ${searchPoNumber} from sheets.`);
+          setShowLoadDialog(false);
+        }
       }
     } catch (e) {
       setLoadError(e.message || "Failed to load PO data.");
@@ -2430,6 +2490,21 @@ export default function GeneratePOView({
               <button className="btn btn-secondary btn-sm" onClick={() => setShowLoadDialog(false)} style={{ borderRadius: '50%', padding: '6px' }}><X size={16} /></button>
             </div>
             <div style={{ padding: '16px 0' }}>
+              <label className="FormLabel">Select from Generated POs</label>
+              <select
+                className="form-input"
+                value={searchPoNumber}
+                onChange={e => setSearchPoNumber(e.target.value)}
+                style={{ width: '100%', marginBottom: '12px', borderRadius: '8px', padding: '8px 12px', border: '1.5px solid var(--border-color)', backgroundColor: '#fff' }}
+              >
+                <option value="">-- Choose PO --</option>
+                {availablePONumbers.map(no => (
+                  <option key={no} value={no}>{no}</option>
+                ))}
+              </select>
+              
+              <div style={{ textAlign: 'center', margin: '4px 0 12px 0', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>— OR TYPE MANUALLY —</div>
+              
               <label className="FormLabel">Enter PO Reference Number</label>
               <input
                 type="text"

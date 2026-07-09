@@ -608,14 +608,16 @@ export default function ReDownloadView({ currencySymbol = 'R', currentUser = nul
 
       const entryUrl = `${localSystemUrl}?action=rgpEntryForm&rgp=${encodeURIComponent(rgp.rgpNo)}`;
       const returnUrl = `${localSystemUrl}?action=rgpReturnForm&rgp=${encodeURIComponent(rgp.rgpNo)}`;
+      const gateUrl = `${localSystemUrl}?action=gateForm&rgp=${encodeURIComponent(rgp.rgpNo)}`;
 
-      let entryQR, returnQR;
+      let entryQR, returnQR, gateQR;
       try { entryQR = await generateQRCode(entryUrl); } catch (qrError) { console.error("Failed to generate entry QR:", qrError); }
       try { returnQR = await generateQRCode(returnUrl); } catch (qrError) { console.error("Failed to generate return QR:", qrError); }
+      try { gateQR = await generateQRCode(gateUrl); } catch (qrError) { console.error("Failed to generate gate QR:", qrError); }
 
       const pdfDoc = generateRgpPDF({
         payload: rgp,
-        options: { qrEntryImage: entryQR, qrReturnImage: returnQR }
+        options: { qrEntryImage: entryQR, qrReturnImage: returnQR, qrGateImage: gateQR }
       });
 
       pdfDoc.save(`RGP-${rgp.rgpNo}.pdf`);

@@ -507,20 +507,34 @@ export default function HistoryView({ designs = [], currencySymbol = 'R', curren
           )
         });
       } else {
-        // Barcode scans (Gate Entry or Material Received)
+        // Barcode scans (Gate Entry, Material Received, or Printing Gate Out)
         const isGate = s.scan_type === 'gate_entry';
+        const isPrintingOut = s.scan_type === 'printing_gate_out';
+        
+        let title = 'Arrival Scanned at Gate';
+        let color = '#14b8a6';
+        if (isPrintingOut) {
+          title = 'Printing Gate Out Scan';
+          color = '#f97316';
+        } else if (!isGate) {
+          title = 'Material Received & Checked-In';
+          color = '#06b6d4';
+        }
+
         events.push({
           type: 'barcode_scan',
-          title: isGate ? 'Arrival Scanned at Gate' : 'Material Received & Checked-In',
+          title: title,
           timestamp: formatDateTime(s.scanned_at) || 'Scanned',
           dateObj: parseToDateObject(s.scanned_at),
           actor: s.person_name,
           icon: <QrCode size={16} />,
-          color: isGate ? '#14b8a6' : '#06b6d4',
+          color: color,
           details: (
             <div style={{ fontSize: '12px', marginTop: '6px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: '6px', border: '1px dashed var(--border-color)' }}>
               {isGate ? (
                 <p><strong>Gatekeeper Log:</strong> Verified delivery bundle from <strong>{s.supplier_name}</strong> carrying item: <em>{s.material_name}</em>.</p>
+              ) : isPrintingOut ? (
+                <p><strong>Printing Log:</strong> Sent out <strong>{s.quantity} pcs</strong> of <strong>{s.material_name}</strong> for printing by <strong>{s.person_name}</strong>.</p>
               ) : (
                 <p><strong>Store Log:</strong> Checked-in <strong>{s.quantity} pcs</strong> of <strong>{s.material_name}</strong> into catalog stock from supplier <strong>{s.supplier_name}</strong>.</p>
               )}

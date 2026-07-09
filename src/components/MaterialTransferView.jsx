@@ -154,6 +154,56 @@ export default function MaterialTransferView({ currentUser }) {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Printer connection state
+  const [printerStatus, setPrinterStatus] = useState('offline');
+  const [printerName, setPrinterName] = useState('');
+  const printerWsRef = useRef(null);
+
+  const connectPrinter = () => {
+    if (printerWsRef.current && printerWsRef.current.readyState === WebSocket.OPEN) {
+      printerWsRef.current.close();
+    }
+    setPrinterStatus('connecting');
+    setPrinterName('');
+    try {
+      const ws = new WebSocket('ws://localhost:8765');
+      printerWsRef.current = ws;
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'auth', token: 'fabric-print-secret-key-2024' }));
+      };
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'auth_success') {
+          ws.send(JSON.stringify({ type: 'status' }));
+        } else if (msg.type === 'status') {
+          setPrinterStatus('online');
+          setPrinterName(msg.printerName || 'USB Printer');
+          ws.close();
+        } else if (msg.type === 'auth_failed') {
+          setPrinterStatus('offline');
+          ws.close();
+        }
+      };
+      ws.onerror = () => setPrinterStatus('offline');
+      ws.onclose = () => { if (printerStatus === 'connecting') setPrinterStatus('offline'); };
+      setTimeout(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          setPrinterStatus('online');
+          setPrinterName('USB Printer');
+          ws.close();
+        }
+      }, 3000);
+    } catch (e) {
+      setPrinterStatus('offline');
+    }
+  };
+
+  useEffect(() => {
+    connectPrinter();
+    const interval = setInterval(connectPrinter, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const selectedMaterial = materials.find(m => m.id === selectedMaterialId);
 
   // Fetch materials & transfer logs
@@ -337,29 +387,89 @@ export default function MaterialTransferView({ currentUser }) {
     }
   };
 
-  const handlePrintTransferLabel = (item) => {
-    // Attempt WebSocket connection to python print service to print transfer receipt
+  const handlePrintTransferLabel = async (item) => {
+    const material = materials.find(m => String(m.id) === String(item.materialCode));
+    const totalToPrint = item.quantity || 1;
+
+    let matchingCaptures = [];
+    try {
+      const res = await fetch(`${getBackendUrl()}/api/weight-capture`);
+      if (res.ok) {
+        const result = await res.json();
+        const captures = result.data || [];
+        matchingCaptures = captures.filter(c => String(c.materialCode) === String(item.materialCode));
+      }
+    } catch (err) {
+      console.warn("Failed to fetch weight captures for transfer label:", err);
+    }
+
     try {
       const pws = new WebSocket('ws://localhost:8765');
-      pws.onopen = () => {
-        pws.send(JSON.stringify({ type: 'auth', token: 'fabric-print-secret-key-2024' }));
-      };
-      pws.onmessage = (ev) => {
-        const msg = JSON.parse(ev.data);
-        if (msg.type === 'auth_success') {
-          const d = new Date();
-          const printDate =
-            String(d.getDate()).padStart(2, '0') + '-' +
-            String(d.getMonth() + 1).padStart(2, '0') + '-' +
-            d.getFullYear() + ' ' +
-            String(d.getHours()).padStart(2, '0') + ':' +
-            String(d.getMinutes()).padStart(2, '0');
+      let nextPkt = 1;
 
-          const payload = {
+      const sendNext = () => {
+        if (nextPkt > totalToPrint) {
+          alert(`✅ All ${totalToPrint} sticker(s) printed via Python Print Service!`);
+          pws.close();
+          return;
+        }
+
+        const d = new Date();
+        const printDate =
+          String(d.getDate()).padStart(2, '0') + '-' +
+          String(d.getMonth() + 1).padStart(2, '0') + '-' +
+          d.getFullYear() + ' ' +
+          String(d.getHours()).padStart(2, '0') + ':' +
+          String(d.getMinutes()).padStart(2, '0');
+
+        let payload;
+
+        if (material) {
+          const totalPkts = Math.max(1, material.packets || 1);
+          const pktQty = Math.round((material.stock / totalPkts) * 100) / 100;
+          const pktBarcodeId = `${material.id}-A${String(nextPkt).padStart(2, '0')}`;
+
+          const capture = matchingCaptures.find(c => c.barcodeId === pktBarcodeId)
+            || matchingCaptures[nextPkt - 1]
+            || matchingCaptures[0];
+
+          const displayWeight = capture ? `${capture.netWeightKg} KG` : `${pktQty} ${material.unit || 'Pcs'}`;
+          const displayPieces = capture ? String(capture.pieces) : String(pktQty);
+          const displayTotalQty = capture ? `${capture.pieces} ${material.unit || 'Pcs'}` : `${material.stock} ${material.unit || 'Pcs'}`;
+          const displayPo = capture?.poNumber || material.poNumber || material.po || 'N/A';
+          const displayBill = capture?.invoiceNo || material.invoiceNo || material.billNo || 'N/A';
+          const displayCmp = capture?.supplier || material.supplier || 'paras';
+
+          payload = {
+            type: 'print_accessory',
+            data: {
+              cmp: displayCmp,
+              materialName: material.name,
+              materialCode: material.id,
+              category: material.category || 'Accessory',
+              shade: material.color || 'Default',
+              weight: displayWeight,
+              pieces: displayPieces,
+              totalQty: displayTotalQty,
+              unit: material.unit || 'Pcs',
+              location: item.toLocation,
+              date: printDate,
+              poNumber: displayPo,
+              billNo: displayBill,
+              lotNo: material.id,
+              operator: item.operator,
+              authorized: item.operator,
+              packetNo: nextPkt,
+              totalPackets: totalPkts,
+              barcodeId: pktBarcodeId
+            }
+          };
+        } else {
+          payload = {
             type: 'print_accessory',
             data: {
               cmp: 'paras',
-              materialName: `${item.materialName} (TRANSFER)`,
+              materialName: item.materialName,
               materialCode: item.materialCode,
               category: 'Accessory',
               shade: 'Transfer',
@@ -374,19 +484,32 @@ export default function MaterialTransferView({ currentUser }) {
               lotNo: item.materialCode,
               operator: item.operator,
               authorized: item.operator,
-              packetNo: 1,
-              totalPackets: 1,
+              packetNo: nextPkt,
+              totalPackets: totalToPrint,
               barcodeId: `${item.materialCode}-T`
             }
           };
-          pws.send(JSON.stringify(payload));
+        }
+
+        pws.send(JSON.stringify(payload));
+        nextPkt++;
+      };
+
+      pws.onopen = () => {
+        pws.send(JSON.stringify({ type: 'auth', token: 'fabric-print-secret-key-2024' }));
+      };
+
+      pws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'auth_success') {
+          sendNext();
         } else if (msg.type === 'print_accessory_result') {
           if (msg.success) {
-            alert('✅ Sticker printed successfully!');
+            sendNext();
           } else {
-            alert('⚠️ Printer error: ' + msg.message);
+            alert(`⚠️ Printer error: ${msg.message}`);
+            pws.close();
           }
-          pws.close();
         }
       };
     } catch (err) {
@@ -570,17 +693,41 @@ export default function MaterialTransferView({ currentUser }) {
                 View and print receipts of recent warehouse stock relocations.
               </span>
             </div>
-            <button 
-              onClick={fetchData}
-              disabled={loading}
-              style={{
-                padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: '8px',
-                background: 'var(--bg-secondary)', color: 'var(--text-main)', fontSize: '0.75rem', fontWeight: '700',
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
-              }}
-            >
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
-            </button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                onClick={connectPrinter}
+                style={{
+                  padding: '6px 12px',
+                  border: `1.5px solid ${printerStatus === 'online' ? 'rgba(16,185,129,0.25)' : printerStatus === 'connecting' ? 'rgba(251,191,36,0.25)' : 'rgba(239,68,68,0.25)'}`,
+                  borderRadius: '8px',
+                  background: printerStatus === 'online' ? 'rgba(16,185,129,0.1)' : printerStatus === 'connecting' ? 'rgba(251,191,36,0.1)' : 'rgba(239,68,68,0.1)',
+                  color: printerStatus === 'online' ? '#10b981' : printerStatus === 'connecting' ? '#f59e0b' : '#ef4444',
+                  fontSize: '0.75rem',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s'
+                }}
+                title="Click to reconnect print service"
+              >
+                <Printer size={12} />
+                {printerStatus === 'online' ? `Printer: ${printerName || 'Connected'}` : printerStatus === 'connecting' ? 'Connecting...' : 'Connect Printer'}
+              </button>
+
+              <button 
+                onClick={fetchData}
+                disabled={loading}
+                style={{
+                  padding: '6px 12px', border: '1px solid var(--border-color)', borderRadius: '8px',
+                  background: 'var(--bg-secondary)', color: 'var(--text-main)', fontSize: '0.75rem', fontWeight: '700',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px'
+                }}
+              >
+                <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto', flex: 1 }}>

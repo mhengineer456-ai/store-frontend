@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { getBackendUrl } from '../utils/api';
 import {
   Scale, Wifi, WifiOff, Play, Square, Camera, Calculator,
   Save, RefreshCw, Download, FileSpreadsheet, Search, Filter,
@@ -156,7 +157,7 @@ export default function WeightCapture({ racks = [] }) {
 
   // ── Fetch captures log and highest material code from DB on mount ───────────────
   useEffect(() => {
-    fetch('/api/weight-capture')
+    fetch(`${getBackendUrl()}/api/weight-capture`)
       .then(r => r.json())
       .then(res => {
         if (res.success && res.data && res.data.length > 0) {
@@ -496,7 +497,7 @@ export default function WeightCapture({ racks = [] }) {
       showToast(`Record saved: ${pieces.toLocaleString()} ${form.unit}`);
 
       // ── Save to MySQL via backend API ──────────────────────────────────
-      fetch('/api/weight-capture', {
+      fetch(`${getBackendUrl()}/api/weight-capture`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -796,11 +797,11 @@ export default function WeightCapture({ racks = [] }) {
             border: `1.5px solid ${printerStatus === 'online' ? 'rgba(16,185,129,0.25)'
               : printerStatus === 'connecting' ? 'rgba(251,191,36,0.25)'
                 : 'rgba(239,68,68,0.25)'}`,
-            cursor: printerStatus !== 'online' ? 'pointer' : 'default',
+            cursor: 'pointer',
             transition: 'all 0.2s'
           }}
-            onClick={() => printerStatus !== 'online' && connectPrinter()}
-            title={printerStatus !== 'online' ? 'Click to reconnect printer' : printerName}
+            onClick={connectPrinter}
+            title={printerStatus === 'online' ? `Default Printer: ${printerName || 'USB Printer'} (Click to reconnect)` : 'Click to connect print service'}
           >
             {/* Printer icon inline SVG */}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -878,7 +879,7 @@ export default function WeightCapture({ racks = [] }) {
             title="Click to check thermal printer connection"
           >
             <Printer size={14} />
-            Printer: <span style={{ textTransform: 'uppercase', padding: '1px 6px', borderRadius: '4px', background: printerStatus === 'online' ? '#10b981' : '#94a3b8', color: '#fff', fontSize: '10px' }}>{printerStatus === 'online' ? 'CONNECTED' : 'DISCONNECTED'}</span>
+            Printer: <span style={{ textTransform: 'uppercase', padding: '1px 6px', borderRadius: '4px', background: printerStatus === 'online' ? '#10b981' : '#94a3b8', color: '#fff', fontSize: '10px' }}>{printerStatus === 'online' ? `CONNECTED: ${printerName || 'USB Printer'}` : 'DISCONNECTED'}</span>
           </div>
 
           <div style={{

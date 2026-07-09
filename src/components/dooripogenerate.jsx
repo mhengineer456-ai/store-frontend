@@ -2029,6 +2029,17 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
         }
     };
     const initializeZipSelections = async (matrixData, signal) => {
+        let payload = null;
+        if (matrixData.doriPayload) {
+            try {
+                payload = typeof matrixData.doriPayload === 'string'
+                    ? JSON.parse(matrixData.doriPayload)
+                    : matrixData.doriPayload;
+            } catch (e) {
+                console.warn('Failed to parse doriPayload:', e);
+            }
+        }
+
         const initialSelections = {};
         const blockedShades = new Set();
 
@@ -2053,6 +2064,8 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
             if (blockedShades.has(color)) {
                 // This shade is blocked (already has an order)
                 initialSelections[color] = 'BLOCKED';
+            } else if (payload && payload.zipSelections && payload.zipSelections[color] !== undefined) {
+                initialSelections[color] = payload.zipSelections[color];
             } else {
                 // This shade is available for new order
                 initialSelections[color] = '';
@@ -2064,9 +2077,18 @@ export default function DoriOrder({ prefilledLotNo = '', setPrefilledLotNo = () 
         // Store blocked shades for UI display
         setBlockedShades(blockedShades);
 
-        // Initialize with default values
-        setPlacementQuantities({ default: 1 });
-        setPlacementZipTypes({ default: availableZipTypes[0] || '' });
+        if (payload) {
+            if (payload.supervisor) setSupervisor(payload.supervisor);
+            if (payload.priority) setPriority(payload.priority);
+            if (payload.issueDate) setIssueDate(payload.issueDate);
+            if (payload.selectedPlacements) setSelectedPlacements(payload.selectedPlacements);
+            if (payload.placementQuantities) setPlacementQuantities(payload.placementQuantities);
+            if (payload.placementZipTypes) setPlacementZipTypes(payload.placementZipTypes);
+        } else {
+            // Initialize with default values
+            setPlacementQuantities({ default: 1 });
+            setPlacementZipTypes({ default: availableZipTypes[0] || '' });
+        }
     };
 
     const handleClear = () => {

@@ -103,7 +103,7 @@ const AUTHORIZED_BY_OPTIONS = [
 
 // Enhanced RGP PDF Generator - With Prepared By & Authorized By
 export function generateRgpPDF({ payload, options = {} }) {
-  const { qrEntryImage = null, qrReturnImage = null, qrSide = 96 } = options;
+  const { qrEntryImage = null, qrReturnImage = null, qrGateImage = null, qrSide = 96 } = options;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   doc.setFont("helvetica", "normal");
   doc.setLineWidth(0.6);
@@ -212,7 +212,7 @@ export function generateRgpPDF({ payload, options = {} }) {
 
     roundRect(x3, y, wGate, blockH, 7, "S");
     setSize(10);
-    bold(); text("GATE ENTRY — SCAN", x3 + 12, y + 14); normal();
+    bold(); text("MATERIAL OUT — SCAN", x3 + 12, y + 14); normal();
     line(x3 + 12, y + 18, x3 + wGate - 12, y + 18);
     if (qrEntryImage) {
       const qx = x3 + 12 + (wGate - 24 - QR_SIDE) / 2;
@@ -344,17 +344,27 @@ export function generateRgpPDF({ payload, options = {} }) {
       try { doc.addImage(qrReturnImage, "PNG", qx, qy, QR_SIDE, QR_SIDE); } catch { }
     }
 
-    // Wide right box: REMARKS
-    const bigW = colW * 2 + page.gap;
-    roundRect(x2, blockTop, bigW, BOTTOM_QR_H, 7, "S");
+    // Center box: GATE ENTRY SCAN
+    roundRect(x2, blockTop, colW, BOTTOM_QR_H, 7, "S");
     setSize(10);
-    bold(); text("REMARKS", x2 + 10, blockTop + 14); normal();
-    line(x2 + 10, blockTop + 18, x2 + bigW - 10, blockTop + 18);
+    bold(); text("GATE ENTRY", x2 + 10, blockTop + 14); normal();
+    line(x2 + 10, blockTop + 18, x2 + colW - 10, blockTop + 18);
+    if (qrGateImage) {
+      const qx = x2 + 10 + (colW - 20 - QR_SIDE) / 2;
+      const qy = blockTop + 18 + 10;
+      try { doc.addImage(qrGateImage, "PNG", qx, qy, QR_SIDE, QR_SIDE); } catch { }
+    }
+
+    // Right box: REMARKS
+    roundRect(x3, blockTop, colW, BOTTOM_QR_H, 7, "S");
+    setSize(10);
+    bold(); text("REMARKS", x3 + 10, blockTop + 14); normal();
+    line(x3 + 10, blockTop + 18, x3 + colW - 10, blockTop + 18);
     if (payload.remarks) {
-      const remarkLines = wrap(payload.remarks, bigW - 20);
+      const remarkLines = wrap(payload.remarks, colW - 20);
       let ry = blockTop + 30;
       remarkLines.forEach((line) => {
-        text(line, x2 + 10, ry);
+        text(line, x3 + 10, ry);
         ry += 12;
       });
     }
@@ -395,7 +405,7 @@ function PreviewModal({ payload, onClose, onConfirm, loading }) {
           ...payload,
           rgpNo: payload.rgpNo === "(auto)" ? "RGP-PREVIEW-001" : payload.rgpNo
         };
-        const doc = generateRgpPDF({ payload: previewPayload, options: { qrEntryImage: null, qrReturnImage: null } });
+        const doc = generateRgpPDF({ payload: previewPayload, options: { qrEntryImage: null, qrReturnImage: null, qrGateImage: null } });
         const pdfBlob = doc.output('blob');
         const pdfUrl = URL.createObjectURL(pdfBlob);
         setPreviewPdfUrl(pdfUrl);
@@ -545,6 +555,258 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       }
     }
   }, [prefilledRgpData, setPrefilledRgpData, currentUser]);
+
+  // Prefill from previous RGP state
+  const [oldRgpSearch, setOldRgpSearch] = useState("");
+  const [fetchingOldRgp, setFetchingOldRgp] = useState(false);
+  const [oldRgpError, setOldRgpError] = useState("");
+
+  // Prefill from previous PO state
+  const [oldPoSearch, setOldPoSearch] = useState("");
+  const [fetchingOldPo, setFetchingOldPo] = useState(false);
+  const [oldPoError, setOldPoError] = useState("");
+
+  const handleFetchOldRgpDetails = async () => {
+    const trimmed = oldRgpSearch.trim();
+    if (!trimmed) return;
+    setFetchingOldRgp(true);
+    setOldRgpError("");
+    try {
+      const backendUrl = getBackendUrl();
+      
+      // 1. Try to fetch from the new dedicated RGP endpoint first
+      let oldPayload = null;
+      try {
+        const res = await fetch(`${backendUrl}/api/rgp/${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          const rgpData = await res.json();
+          if (rgpData) {
+            oldPayload = rgpData;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch RGP from dedicated table, falling back to scans:", err.message);
+      }
+
+      // 2. Fallback to scans if not found in dedicated rgp table
+      if (!oldPayload) {
+        const res = await fetch(`${backendUrl}/api/scans`);
+        if (!res.ok) throw new Error("Failed to fetch scan logs");
+        const scans = await res.json();
+        const foundScan = scans.find(
+          (s) =>
+            s.scan_type === "rgp_entry" &&
+            s.lot_number &&
+            s.lot_number.toLowerCase().trim() === trimmed.toLowerCase()
+        );
+        if (!foundScan) {
+          setOldRgpError("RGP not found in database.");
+          return;
+        }
+        if (!foundScan.rgp_payload) {
+          setOldRgpError("RGP found, but no saved payload data exists.");
+          return;
+        }
+        oldPayload = typeof foundScan.rgp_payload === "string" 
+          ? JSON.parse(foundScan.rgp_payload) 
+          : foundScan.rgp_payload;
+      }
+      
+      // Prefill form
+      const oldEntries = Array.isArray(oldPayload.entries) ? oldPayload.entries : [];
+      const mappedEntries = oldEntries.map((r, idx) => ({
+        lotNo: r.lotNo || "N/A",
+        itemDesc: r.itemDesc || "",
+        qty1: r.qty1 !== undefined ? String(r.qty1) : "",
+        qty2: r.qty2 !== undefined ? String(r.qty2) : "0",
+        uom: r.uom || "PCS",
+        department: r.department || "Stitching",
+        purpose: r.purpose || "Stitching"
+      }));
+
+      setForm((prev) => ({
+        ...prev,
+        vendor: oldPayload.vendor || prev.vendor,
+        rgpType: oldPayload.rgpType || prev.rgpType,
+        department: oldPayload.department || prev.department,
+        purpose: oldPayload.purpose || prev.purpose,
+        itemDesc: oldPayload.itemDesc || prev.itemDesc,
+        qty: oldPayload.qty || prev.qty,
+        uom: oldPayload.uom || prev.uom,
+        entries: mappedEntries,
+        expectedReturnDate: oldPayload.expectedReturnDate || prev.expectedReturnDate,
+        vehicleNo: oldPayload.vehicleNo || prev.vehicleNo,
+        preparedBy: oldPayload.preparedBy || prev.preparedBy,
+        authorizedBy: oldPayload.authorizedBy || prev.authorizedBy,
+        remarks: oldPayload.remarks || prev.remarks,
+      }));
+      
+      // Handle custom Prepared By option
+      if (oldPayload.preparedBy) {
+        const isDefaultPrep = PREPARED_BY_OPTIONS.map(x => x.toLowerCase()).includes(oldPayload.preparedBy.toLowerCase());
+        if (!isDefaultPrep) {
+          setIsPreparedByCustom(true);
+          setPreparedByCustomValue(oldPayload.preparedBy);
+        } else {
+          setIsPreparedByCustom(false);
+          setPreparedByCustomValue("");
+        }
+      }
+      
+      // Handle custom Authorized By option
+      if (oldPayload.authorizedBy) {
+        const isDefaultAuth = AUTHORIZED_BY_OPTIONS.map(x => x.toLowerCase()).includes(oldPayload.authorizedBy.toLowerCase());
+        if (!isDefaultAuth) {
+          setIsAuthorizedByCustom(true);
+          setAuthorizedByCustomValue(oldPayload.authorizedBy);
+        } else {
+          setIsAuthorizedByCustom(false);
+          setAuthorizedByCustomValue("");
+        }
+      }
+      
+      setOldRgpSearch("");
+      alert("Old RGP details successfully loaded!");
+    } catch (err) {
+      console.error(err);
+      setOldRgpError("Error fetching RGP data: " + err.message);
+    } finally {
+      setFetchingOldRgp(false);
+    }
+  };
+
+  const handleFetchOldPoDetails = async () => {
+    const trimmed = oldPoSearch.trim();
+    if (!trimmed) return;
+    setFetchingOldPo(true);
+    setOldPoError("");
+    try {
+      const backendUrl = getBackendUrl();
+      let foundPoDetails = null;
+      let poType = ""; // "general", "zip", "dori"
+
+      // 1. Try fetching from general POs (/api/pos/:poNumber)
+      try {
+        const res = await fetch(`${backendUrl}/api/pos/${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          const po = await res.json();
+          if (po) {
+            foundPoDetails = po;
+            poType = "general";
+          }
+        }
+      } catch (err) {
+        console.warn("Not found in general POs or error:", err.message);
+      }
+
+      // 2. Try fetching from Zip POs (cutting headers)
+      if (!foundPoDetails) {
+        try {
+          const res = await fetch(`${backendUrl}/api/cutting-headers`);
+          if (res.ok) {
+            const headers = await res.json();
+            const matchingHeader = headers.find(h => {
+              if (!h.zip_payload) return false;
+              try {
+                const parsed = typeof h.zip_payload === 'string' ? JSON.parse(h.zip_payload) : h.zip_payload;
+                return parsed.poNumber && parsed.poNumber.toLowerCase().trim() === trimmed.toLowerCase();
+              } catch (_) {
+                return false;
+              }
+            });
+            if (matchingHeader) {
+              foundPoDetails = typeof matchingHeader.zip_payload === 'string' 
+                ? JSON.parse(matchingHeader.zip_payload) 
+                : matchingHeader.zip_payload;
+              poType = "zip";
+            }
+          }
+        } catch (err) {
+          console.warn("Not found in zip POs or error:", err.message);
+        }
+      }
+
+      // 3. Try fetching from Dori POs (doori orders)
+      if (!foundPoDetails) {
+        try {
+          const res = await fetch(`${backendUrl}/api/doori-orders`);
+          if (res.ok) {
+            const orders = await res.json();
+            const matchingOrder = orders.find(o => 
+              o.po_number && o.po_number.toLowerCase().trim() === trimmed.toLowerCase()
+            );
+            if (matchingOrder) {
+              foundPoDetails = matchingOrder.dori_payload 
+                ? (typeof matchingOrder.dori_payload === 'string' ? JSON.parse(matchingOrder.dori_payload) : matchingOrder.dori_payload)
+                : matchingOrder;
+              poType = "dori";
+            }
+          }
+        } catch (err) {
+          console.warn("Not found in doori POs or error:", err.message);
+        }
+      }
+
+      if (!foundPoDetails) {
+        setOldPoError("Purchase Order (PO) not found in database.");
+        return;
+      }
+
+      // Prefill RGP form using PO details
+      if (poType === "general") {
+        const mappedEntries = (foundPoDetails.items || []).map((item) => ({
+          lotNo: foundPoDetails.designName || foundPoDetails.poNumber || "N/A",
+          itemDesc: item.description || item.item || "",
+          qty1: String(item.qty || item.quantity || 0),
+          qty2: "0",
+          uom: item.uom || item.unit || "PCS",
+          department: item.department || item.dept || "Store",
+          purpose: "Issue under PO",
+        }));
+
+        setForm((prev) => ({
+          ...prev,
+          vendor: foundPoDetails.vendorName || prev.vendor,
+          rgpType: "Tools",
+          remarks: `Prefilled from Purchase Order #${foundPoDetails.poNumber}.`,
+          entries: mappedEntries,
+        }));
+      } else if (poType === "zip" || poType === "dori") {
+        const mappedEntries = [];
+        if (foundPoDetails.zipSelections) {
+          Object.entries(foundPoDetails.zipSelections).forEach(([color, selection]) => {
+            if (selection && selection.trim() !== "" && selection !== "BLOCKED") {
+              mappedEntries.push({
+                lotNo: foundPoDetails.poNumber || "N/A",
+                itemDesc: `${poType.toUpperCase()} Shade: ${color} (${selection})`,
+                qty1: "0",
+                qty2: "0",
+                uom: "PCS",
+                department: "Stitching",
+                purpose: "Stitching/Finishing",
+              });
+            }
+          });
+        }
+
+        setForm((prev) => ({
+          ...prev,
+          vendor: prev.vendor,
+          rgpType: "Other",
+          remarks: `Prefilled from ${poType.toUpperCase()} PO #${foundPoDetails.poNumber}.`,
+          entries: mappedEntries,
+        }));
+      }
+
+      setOldPoSearch("");
+      alert(`PO details loaded into RGP form successfully!`);
+    } catch (err) {
+      console.error(err);
+      setOldPoError("Error fetching PO data: " + err.message);
+    } finally {
+      setFetchingOldPo(false);
+    }
+  };
 
   const fetchNextRgpNo = async () => {
     let maxSeq = 0;
@@ -1014,12 +1276,20 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
   const handlePreview = (e) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      alert("❌ Form is incomplete! Please check for missing fields and ensure you added at least one item row before previewing.");
+      return;
+    }
     setShowPreview(true);
   };
 
   const handleFinalSubmit = async () => {
     if (submitting) return;
+
+    if (!validate()) {
+      alert("❌ Form is incomplete! Please fill in all required fields and ensure you added at least one item row before saving.");
+      return;
+    }
 
     const first = (form.entries || [])[0] || {};
     const legacyQty = (Number(first.qty1) || 0) || "";
@@ -1056,30 +1326,19 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
       createdAt: new Date().toISOString(),
     };
 
-    const saveRgpToScans = async (rgpNoVal) => {
+    const saveRgpToDatabase = async (rgpNoVal) => {
       try {
-        const hostname = window.location.hostname;
-        const calculatedTotalQty = (form.entries || []).reduce((sum, entry) => sum + (Number(entry.qty1) || 0), 0);
         const finalPayload = { ...payload, rgpNo: rgpNoVal };
-        const scanPayload = {
-          lot_number: rgpNoVal,
-          scan_type: 'rgp_entry', // Represents RGP Issue / Out
-          person_name: finalPreparedBy || 'System',
-          material_name: rgpTypeFinal || 'RGP Document',
-          quantity: calculatedTotalQty || 1,
-          supplier_name: form.vendor || 'N/A',
-          rgp_payload: JSON.stringify(finalPayload)
-        };
-        const response = await fetch(`${getBackendUrl()}/api/scans`, {
+        const response = await fetch(`${getBackendUrl()}/api/rgp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(scanPayload)
+          body: JSON.stringify(finalPayload)
         });
         if (!response.ok) {
-          console.error("Failed to save RGP to scans database:", await response.text());
+          console.error("Failed to save RGP to rgp database:", await response.text());
         }
       } catch (err) {
-        console.error("Failed to save RGP to scans database:", err);
+        console.error("Failed to save RGP to rgp database:", err);
       }
     };
 
@@ -1101,8 +1360,8 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
       const payloadWithNo = { ...payload, rgpNo: localRgpNo };
 
-      // Save RGP number to scans database to sync next RGP sequence
-      await saveRgpToScans(localRgpNo);
+      // Save RGP number to scans database and dedicated rgp table
+      await saveRgpToDatabase(localRgpNo);
 
       let localSystemUrl = `${window.location.origin}/`;
       const isLocalHostOrIP =
@@ -1131,19 +1390,22 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
       const entryUrl = `${localSystemUrl}?action=rgpEntryForm&rgp=${encodeURIComponent(localRgpNo)}`;
       const returnUrl = `${localSystemUrl}?action=rgpReturnForm&rgp=${encodeURIComponent(localRgpNo)}`;
+      const gateUrl = `${localSystemUrl}?action=gateForm&rgp=${encodeURIComponent(localRgpNo)}`;
 
-      let entryQR, returnQR;
+      let entryQR, returnQR, gateQR;
       try { entryQR = await generateQRCode(entryUrl); } catch (qrError) { console.error("Failed to generate entry QR:", qrError); }
       try { returnQR = await generateQRCode(returnUrl); } catch (qrError) { console.error("Failed to generate return QR:", qrError); }
+      try { gateQR = await generateQRCode(gateUrl); } catch (qrError) { console.error("Failed to generate gate QR:", qrError); }
 
-      let entryQRDataUrl = entryQR, returnQRDataUrl = returnQR;
+      let entryQRDataUrl = entryQR, returnQRDataUrl = returnQR, gateQRDataUrl = gateQR;
       if (entryQR && entryQR.startsWith('blob:')) { try { entryQRDataUrl = await toDataURL(entryQR); } catch (error) { console.warn("Failed to convert entry QR to data URL:", error); } }
       if (returnQR && returnQR.startsWith('blob:')) { try { returnQRDataUrl = await toDataURL(returnQR); } catch (error) { console.warn("Failed to convert return QR to data URL:", error); } }
+      if (gateQR && gateQR.startsWith('blob:')) { try { gateQRDataUrl = await toDataURL(gateQR); } catch (error) { console.warn("Failed to convert gate QR to data URL:", error); } }
 
       setForm((f) => ({ ...f, rgpNo: localRgpNo }));
       if (onSubmit) onSubmit(payloadWithNo);
 
-      const pdfDoc = generateRgpPDF({ payload: payloadWithNo, options: { qrEntryImage: entryQRDataUrl, qrReturnImage: returnQRDataUrl } });
+      const pdfDoc = generateRgpPDF({ payload: payloadWithNo, options: { qrEntryImage: entryQRDataUrl, qrReturnImage: returnQRDataUrl, qrGateImage: gateQRDataUrl } });
       pdfDoc.save(`RGP-${localRgpNo}.pdf`);
 
       setShowPreview(false);
@@ -1200,22 +1462,25 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
 
       const entryUrl = `${localSystemUrl}?action=rgpEntryForm&rgp=${encodeURIComponent(assignedRgpNo)}`;
       const returnUrl = `${localSystemUrl}?action=rgpReturnForm&rgp=${encodeURIComponent(assignedRgpNo)}`;
+      const gateUrl = `${localSystemUrl}?action=gateForm&rgp=${encodeURIComponent(assignedRgpNo)}`;
 
-      let entryQR, returnQR;
+      let entryQR, returnQR, gateQR;
       try { entryQR = await generateQRCode(entryUrl); } catch (qrError) { console.error("Failed to generate entry QR:", qrError); }
       try { returnQR = await generateQRCode(returnUrl); } catch (qrError) { console.error("Failed to generate return QR:", qrError); }
+      try { gateQR = await generateQRCode(gateUrl); } catch (qrError) { console.error("Failed to generate gate QR:", qrError); }
 
-      let entryQRDataUrl = entryQR, returnQRDataUrl = returnQR;
+      let entryQRDataUrl = entryQR, returnQRDataUrl = returnQR, gateQRDataUrl = gateQR;
       if (entryQR && entryQR.startsWith('blob:')) { try { entryQRDataUrl = await toDataURL(entryQR); } catch (error) { console.warn("Failed to convert entry QR to data URL:", error); } }
       if (returnQR && returnQR.startsWith('blob:')) { try { returnQRDataUrl = await toDataURL(returnQR); } catch (error) { console.warn("Failed to convert return QR to data URL:", error); } }
+      if (gateQR && gateQR.startsWith('blob:')) { try { gateQRDataUrl = await toDataURL(gateQR); } catch (error) { console.warn("Failed to convert gate QR to data URL:", error); } }
 
       setForm((f) => ({ ...f, rgpNo: assignedRgpNo }));
       if (onSubmit) onSubmit({ ...payload, rgpNo: assignedRgpNo });
 
-      // Save RGP number to scans database to sync next RGP sequence
-      await saveRgpToScans(assignedRgpNo);
+      // Save RGP number to scans database and dedicated rgp table
+      await saveRgpToDatabase(assignedRgpNo);
 
-      const pdfDoc = generateRgpPDF({ payload: { ...payload, rgpNo: assignedRgpNo }, options: { qrEntryImage: entryQRDataUrl, qrReturnImage: returnQRDataUrl } });
+      const pdfDoc = generateRgpPDF({ payload: { ...payload, rgpNo: assignedRgpNo }, options: { qrEntryImage: entryQRDataUrl, qrReturnImage: returnQRDataUrl, qrGateImage: gateQRDataUrl } });
       const safeNo = assignedRgpNo.replace(/[^\w\-]+/g, "-");
       pdfDoc.save(`RGP-${safeNo}.pdf`);
 
@@ -1308,9 +1573,109 @@ export default function FabricRgpForm({ today = new Date(), onSubmit, onBack, pr
   // Calculate total quantity for display
   const totalQuantity = (form.entries || []).reduce((sum, entry) => sum + (Number(entry.qty1) || 0), 0);
 
-  // Render Helper: Issue details + authorization + remarks
   const renderLeftColumnDetails = () => (
     <>
+      {/* Prefill from Old RGP or PO */}
+      <div style={{
+        backgroundColor: '#f0fdf4',
+        border: '1px solid #10b981',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '20px',
+        boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.05)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+          <Emoji size={18} mr={8}>🔄</Emoji>
+          <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700', color: '#065f46' }}>Prefill Details</h4>
+        </div>
+        
+        <p style={{ fontSize: '0.8rem', color: '#047857', margin: '0 0 12px 0' }}>
+          Copy details from a previous RGP or Purchase Order (PO) to avoid manual typing.
+        </p>
+
+        {/* Row 1: RGP Search */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          <input
+            value={oldRgpSearch}
+            onChange={(e) => setOldRgpSearch(e.target.value)}
+            placeholder="Enter old RGP (e.g. RGP-000001)"
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1.5px solid #a7f3d0',
+              fontSize: '14px',
+              outline: 'none',
+              backgroundColor: '#ffffff',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleFetchOldRgpDetails}
+            disabled={fetchingOldRgp}
+            style={{
+              padding: '0 16px',
+              backgroundColor: '#10b981',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '600',
+              fontSize: '13px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {fetchingOldRgp ? "Loading..." : "Prefill RGP"}
+          </button>
+        </div>
+        {oldRgpError && (
+          <div style={{ color: '#ef4444', fontSize: '12px', marginBottom: '10px', fontWeight: '500' }}>
+            ⚠️ {oldRgpError}
+          </div>
+        )}
+
+        {/* Row 2: PO Search */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            value={oldPoSearch}
+            onChange={(e) => setOldPoSearch(e.target.value)}
+            placeholder="Enter PO # (e.g. PO-83425 or ZIP-PO-0001)"
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1.5px solid #a7f3d0',
+              fontSize: '14px',
+              outline: 'none',
+              backgroundColor: '#ffffff',
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleFetchOldPoDetails}
+            disabled={fetchingOldPo}
+            style={{
+              padding: '0 16px',
+              backgroundColor: '#10b981',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: '600',
+              fontSize: '13px',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {fetchingOldPo ? "Loading..." : "Prefill PO"}
+          </button>
+        </div>
+        {oldPoError && (
+          <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px', fontWeight: '500' }}>
+            ⚠️ {oldPoError}
+          </div>
+        )}
+      </div>
+
       {/* Issue Details Section */}
       <div style={styles.section}>
         <div style={styles.sectionHeader}>

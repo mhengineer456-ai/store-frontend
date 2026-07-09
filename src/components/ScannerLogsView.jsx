@@ -38,6 +38,7 @@ export default function ScannerLogsView({ currencySymbol = 'R' }) {
   const formatScanType = (type) => {
     if (type === 'gate_entry') return { text: 'Gate Entry', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.2)' };
     if (type === 'material_in') return { text: 'Material In', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.2)' };
+    if (type === 'printing_gate_out') return { text: 'Printing Gate Out', color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', border: 'rgba(249, 115, 22, 0.2)' };
     if (type === 'supplier_entry') return { text: 'Supplier Entry', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.2)' };
     if (type === 'rgp_entry') return { text: 'RGP Issue', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', border: 'rgba(168, 85, 247, 0.2)' };
     if (type === 'rgp_return') return { text: 'RGP Return', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', border: 'rgba(236, 72, 153, 0.2)' };
@@ -168,6 +169,7 @@ export default function ScannerLogsView({ currencySymbol = 'R' }) {
           <option value="all">All Scan Types</option>
           <option value="gate_entry">Gate Entry</option>
           <option value="material_in">Material In</option>
+          <option value="printing_gate_out">Printing Gate Out</option>
           <option value="supplier_entry">Supplier Entry</option>
           <option value="rgp_entry">RGP Issue</option>
           <option value="rgp_return">RGP Return</option>
